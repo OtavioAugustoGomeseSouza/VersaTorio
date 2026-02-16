@@ -1,0 +1,53 @@
+# =========================
+# Node / Nest (qualquer pasta)
+# =========================
+**/node_modules/
+**/dist/
+**/build/
+**/out/
+**/coverage/
+**/*.tsbuildinfo
+
+# Logs
+**/logs/
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/pnpm-debug.log*
+
+# Cache / temp
+**/.cache/
+**/.temp/
+**/.tmp/
+**/.nyc_output/
+
+# =========================
+# Env (não subir segredos)
+# =========================
+**/.env
+**/.env.*
+!.env.example
+
+# =========================
+# IDE
+# =========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Docker / volumes locais
+# =========================
+**/mysql_data/
+**/.dockerignore
