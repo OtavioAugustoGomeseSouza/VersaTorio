@@ -449,6 +449,364 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Exams",
+			"item": [
+				{
+					"name": "Create Exam",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Prova de Matemática\",\n    \"description\": \"Assuntos básicos\",\n    \"userId\": \"uuid-do-usuario\",\n    \"subjectId\": \"uuid-da-materia\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{tcc_url}}/exams",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"exams"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Find All Exams",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/exams",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"exams"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Find One Exam",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/exams/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"exams",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-prova"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Exam",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Nome atualizado da prova\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{tcc_url}}/exams/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"exams",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-prova"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Exam",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/exams/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"exams",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-prova"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Subject",
+			"item": [
+				{
+					"name": "Create Subject",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Matemática\",\n    \"description\": \"Fundamentos\",\n    \"userId\": \"uuid-do-usuario\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{tcc_url}}/subject",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"subject"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Find All Subjects",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/subject",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"subject"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Find One Subject",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/subject/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"subject",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-materia"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Subject",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Nome atualizado da matéria\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{tcc_url}}/subject/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"subject",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-materia"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Subject",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{tcc_url}}/subject/:id",
+							"host": [
+								"{{tcc_url}}"
+							],
+							"path": [
+								"subject",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "uuid-da-materia"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"event": [

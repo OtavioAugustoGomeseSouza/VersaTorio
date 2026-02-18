@@ -1,6 +1,11 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { QuestionType } from '../entities/question.entity';
-
 
 export class CreateQuestionDto {
   @IsString()
@@ -9,4 +14,8 @@ export class CreateQuestionDto {
 
   @IsEnum(QuestionType)
   type: QuestionType;
+
+  @IsUUID()
+  @IsOptional()
+  examId?: string;
 }

@@ -28,7 +28,7 @@ export class AuthService {
       password: hash,
     });
 
-    return this.signToken(user.id, user.email);
+    return this.signToken(user.id, user.email, user.role);
   }
 
   async login(dto: LoginUserDto) {
@@ -38,11 +38,11 @@ export class AuthService {
     const ok = await bcrypt.compare(dto.password, user.password);
     if (!ok) throw new UnauthorizedException('Credenciais inválidas');
 
-    return this.signToken(user.id, user.email);
+    return this.signToken(user.id, user.email, user.role);
   }
 
-  private signToken(userId: string, email: string) {
-    const payload = { sub: userId, email };
+  private signToken(userId: string, email: string, role: string) {
+    const payload = { sub: userId, email, role: role.toLowerCase() };
     return { access_token: this.jwt.sign(payload) };
   }
 }
