@@ -20,7 +20,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     env_file:
       - .env
     depends_on:
@@ -31,7 +31,7 @@ services:
       PORT: 3000
       DATABASE_URL: "mysql://tcc:tcc@mysql:3306/tcc"
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./backend:/app
       - /app/node_modules
