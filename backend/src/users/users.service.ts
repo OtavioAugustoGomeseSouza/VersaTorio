@@ -1,32 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserEntity } from './entities/user.entity';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  findByEmailWithPassword(email: string) {
-    return this.prisma.user.findUnique({ where: { email } });
+  async findByEmailWithPassword(email: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    return user as UserEntity;
   }
-  
-  findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true, createdAt: true },
     });
+    return user ? plainToInstance(UserEntity, user) : null;
   }
 
-  async create(data: { email: string; name?: string; password: string }) {
-    return this.prisma.user.create({
+  async create(data: {
+    email: string;
+    name?: string;
+    password: string;
+  }): Promise<UserEntity> {
+    const user = await this.prisma.user.create({
       data,
-      select: { id: true, email: true, name: true, createdAt: true },
     });
+    return plainToInstance(UserEntity, user);
   }
 
-  findById(id: string) {
-    return this.prisma.user.findUnique({
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, createdAt: true },
     });
+    return user ? plainToInstance(UserEntity, user) : null;
   }
 }

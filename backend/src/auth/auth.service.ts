@@ -1,13 +1,22 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { LoginUserDto } from '../users/dto/login-user.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(private users: UsersService, private jwt: JwtService) {}
+  constructor(
+    private users: UsersService,
+    private jwt: JwtService,
+  ) {}
 
-  async register(dto: { email: string; name?: string; password: string }) {
+  async register(dto: CreateUserDto) {
     const existing = await this.users.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email já cadastrado');
 
@@ -22,7 +31,7 @@ export class AuthService {
     return this.signToken(user.id, user.email);
   }
 
-  async login(dto: { email: string; password: string }) {
+  async login(dto: LoginUserDto) {
     const user = await this.users.findByEmailWithPassword(dto.email);
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
 
