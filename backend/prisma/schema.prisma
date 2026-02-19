@@ -23,15 +23,15 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String?
-  email     String   @unique
+  email     String    @unique
   password  String
-  role      Role     @default(USER)
+  role      Role      @default(USER)
   subjects  Subject[]
   exams     Exam[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Subject {
@@ -41,22 +41,23 @@ model Subject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  exams     Exam[]
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exams Exam[]
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Exam {
-  id        String   @id @default(uuid())
-  name      String
+  id          String   @id @default(uuid())
+  name        String
   description String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  userId    String
-  subjectId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  subjectId   String
 
   questions Question[]
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  versions  ExamVersion[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
 
 model Question {
@@ -68,7 +69,17 @@ model Question {
   updatedAt    DateTime      @updatedAt
   examId       String?
 
-  exam         Exam?          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  exam Exam? @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model ExamVersion {
+  id        String   @id @default(uuid())
+  name      String // "Versão A", "Versão B"
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  orderData Json // Armazena a estrutura embaralhada: { questions: [{ id, alternatives: [id, id] }] }
+  pdfUrl    String?
+  createdAt DateTime @default(now())
 }
 
 model Alternative {
@@ -80,6 +91,5 @@ model Alternative {
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
-  question   Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
-

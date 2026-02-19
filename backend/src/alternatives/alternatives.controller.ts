@@ -11,7 +11,10 @@ import {
 import { AlternativesService } from './alternatives.service';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
-import { AuthTokenPayload } from '../auth/interfaces/auth-token-payload.interface';
+import {
+  AuthTokenPayload,
+  type AuthenticatedRequest,
+} from '../auth/interfaces/auth-token-payload.interface';
 
 @Controller('alternatives')
 export class AlternativesController {
@@ -20,20 +23,20 @@ export class AlternativesController {
   @Post()
   create(
     @Body() createAlternativeDto: CreateAlternativeDto,
-    @Req() request: any,
+    @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
     return this.alternativesService.create(createAlternativeDto, authUser);
   }
 
   @Get()
-  findAll(@Req() request: any) {
+  findAll(@Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.alternativesService.findAll(authUser);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() request: any) {
+  findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.alternativesService.findOne(id, authUser);
   }
@@ -42,14 +45,14 @@ export class AlternativesController {
   update(
     @Param('id') id: string,
     @Body() updateAlternativeDto: UpdateAlternativeDto,
-    @Req() request: any,
+    @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
     return this.alternativesService.update(id, updateAlternativeDto, authUser);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() request: any) {
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.alternativesService.remove(id, authUser);
   }

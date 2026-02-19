@@ -11,6 +11,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { ExamsModule } from './exams/exams.module';
 import { SubjectModule } from './subject/subject.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
+import { ExamVersionsModule } from './exam-versions/exam-versions.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { JwtAuthGuard } from './auth/jwt.guard';
     QuestionsModule,
     ExamsModule,
     SubjectModule,
+    ExamVersionsModule,
   ],
   controllers: [AppController],
   providers: [

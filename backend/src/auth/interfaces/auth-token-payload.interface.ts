@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export enum UserRole {
   admin = 'admin',
   user = 'user',
@@ -11,4 +13,8 @@ export interface AuthTokenPayload {
 
 export interface RefreshTokenPayload extends AuthTokenPayload {
   jti: string;
+}
+
+export interface AuthenticatedRequest extends Request {
+  user: AuthTokenPayload;
 }

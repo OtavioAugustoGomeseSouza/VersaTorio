@@ -11,26 +11,32 @@ import {
 import { QuestionsService } from './questions.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
-import { AuthTokenPayload } from '../auth/interfaces/auth-token-payload.interface';
+import {
+  AuthTokenPayload,
+  type AuthenticatedRequest,
+} from '../auth/interfaces/auth-token-payload.interface';
 
 @Controller('questions')
 export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}
 
   @Post()
-  create(@Body() createQuestionDto: CreateQuestionDto, @Req() request: any) {
+  create(
+    @Body() createQuestionDto: CreateQuestionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
     const authUser = request.user;
     return this.questionsService.create(createQuestionDto, authUser);
   }
 
   @Get()
-  findAll(@Req() request: any) {
+  findAll(@Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.questionsService.findAll(authUser);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() request: any) {
+  findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.questionsService.findOne(id, authUser);
   }
@@ -39,14 +45,14 @@ export class QuestionsController {
   update(
     @Param('id') id: string,
     @Body() updateQuestionDto: UpdateQuestionDto,
-    @Req() request: any,
+    @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
     return this.questionsService.update(id, updateQuestionDto, authUser);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() request: any) {
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.questionsService.remove(id, authUser);
   }
