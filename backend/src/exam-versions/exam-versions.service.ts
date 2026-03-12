@@ -36,9 +36,17 @@ export class ExamVersionsService {
     const exam = await this.prisma.exam.findUnique({
       where: { id: examId },
       include: {
-        questions: {
+        examQuestions: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
           include: {
-            alternatives: true,
+            question: {
+              include: {
+                alternatives: true,
+                topic: {
+                  select: { disciplineId: true },
+                },
+              },
+            },
           },
         },
       },
@@ -52,13 +60,21 @@ export class ExamVersionsService {
   }
 
   private validateExamQuestionsForGeneration(exam: AccessibleExam): void {
-    if (exam.questions.length === 0) {
+    if (exam.examQuestions.length === 0) {
       throw new BadRequestException(
         'Cannot generate exam version without questions',
       );
     }
 
-    for (const question of exam.questions) {
+    for (const examQuestion of exam.examQuestions) {
+      const question = examQuestion.question;
+
+      if (question.topic.disciplineId !== exam.disciplineId) {
+        throw new BadRequestException(
+          `Question ${question.id} does not belong to exam discipline`,
+        );
+      }
+
       const totalAlternatives = question.alternatives.length;
       const correctAlternatives = question.alternatives.filter(
         (alternative) => alternative.isCorrect,
@@ -92,7 +108,9 @@ export class ExamVersionsService {
     const exam = await this.getAccessibleExam(examId, authUser);
     this.validateExamQuestionsForGeneration(exam);
 
-    const shuffledQuestions = this.shuffle([...exam.questions]);
+    const shuffledQuestions = this.shuffle(
+      exam.examQuestions.map((examQuestion) => examQuestion.question),
+    );
 
     const orderData: ExamVersionOrderData = {
       questions: shuffledQuestions.map((question, questionIndex) => ({

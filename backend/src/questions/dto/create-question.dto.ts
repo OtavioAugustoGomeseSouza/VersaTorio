@@ -16,5 +16,5 @@ export class CreateQuestionDto {
 
   @IsUUID()
   @IsNotEmpty()
-  examId: string;
+  topicId: string;
 }

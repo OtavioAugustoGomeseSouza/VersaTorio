@@ -1,4 +1,4 @@
-import { QuestionEntity } from '../../questions/entities/question.entity';
+import type { QuestionEntity } from '../../questions/entities/question.entity';
 
 export enum AlternativeType {
   TEXT = 'TEXT',

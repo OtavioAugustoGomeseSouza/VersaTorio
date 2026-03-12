@@ -23,13 +23,21 @@ export class AlternativesService {
   ): Promise<void> {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
-      include: { exam: true },
+      include: {
+        topic: {
+          include: {
+            discipline: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
     });
 
     if (
       !question ||
       (!this.isAdmin(authUser) &&
-        (!question.exam || question.exam.userId !== authUser.id))
+        question.topic.discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(`Question with ID ${questionId} not found`);
     }
@@ -53,8 +61,10 @@ export class AlternativesService {
         ? undefined
         : {
             question: {
-              exam: {
-                userId: authUser.id,
+              topic: {
+                discipline: {
+                  userId: authUser.id,
+                },
               },
             },
           },
@@ -70,7 +80,15 @@ export class AlternativesService {
       where: { id },
       include: {
         question: {
-          include: { exam: true },
+          include: {
+            topic: {
+              include: {
+                discipline: {
+                  select: { userId: true },
+                },
+              },
+            },
+          },
         },
       },
     });
@@ -78,8 +96,7 @@ export class AlternativesService {
     if (
       !alternative ||
       (!this.isAdmin(authUser) &&
-        (!alternative.question.exam ||
-          alternative.question.exam.userId !== authUser.id))
+        alternative.question.topic.discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(`Alternative with ID ${id} not found`);
     }

@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateExamDto {
@@ -11,5 +12,10 @@ export class CreateExamDto {
 
   @IsUUID()
   @IsNotEmpty()
-  subjectId: string;
+  @Transform(({ value, obj }) => value ?? obj.subjectId)
+  disciplineId: string;
+
+  @IsUUID()
+  @IsOptional()
+  subjectId?: string;
 }

@@ -1,5 +1,6 @@
-import { AlternativeEntity } from '../../alternatives/entities/alternative.etity';
-import { ExamEntity } from '../../exams/entities/exam.entity';
+import type { AlternativeEntity } from '../../alternatives/entities/alternative.etity';
+import type { TopicEntity } from '../../topics/entities/topic.entity';
+import type { ExamQuestionEntity } from '../../exams/entities/exam-question.entity';
 
 export enum QuestionType {
   TRUE_FALSE = 'TRUE_FALSE',
@@ -12,8 +13,9 @@ export class QuestionEntity {
   type: QuestionType;
   createdAt: Date;
   updatedAt: Date;
-  examId?: string;
+  topicId: string;
 
-  exam?: ExamEntity;
+  topic?: TopicEntity;
+  examQuestions?: ExamQuestionEntity[];
   alternatives?: AlternativeEntity[];
 }

@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
-export class CreateSubjectDto {
+export class CreateDisciplineDto {
   @IsString()
   @IsNotEmpty()
   name: string;

@@ -37,14 +37,41 @@ async function main() {
     },
   });
 
-  // Questions and Alternatives
-  console.log('Seeding questions and alternatives...');
+  console.log('Seeding disciplines, topics, exams, questions and alternatives...');
+
+  const regularUser = await prisma.user.findUniqueOrThrow({
+    where: { email: 'user@example.com' },
+  });
+
+  const discipline = await prisma.discipline.create({
+    data: {
+      name: 'Algoritmos e Estruturas de Dados',
+      userId: regularUser.id,
+    },
+  });
+
+  const topic = await prisma.topic.create({
+    data: {
+      name: 'Arvores Binarias',
+      disciplineId: discipline.id,
+    },
+  });
+
+  const exam = await prisma.exam.create({
+    data: {
+      name: 'Prova 1',
+      description: 'Versao base da prova',
+      userId: regularUser.id,
+      disciplineId: discipline.id,
+    },
+  });
 
   // Question 1: Multiple Choice
-  await prisma.question.create({
+  const question1 = await prisma.question.create({
     data: {
       text: 'Qual destas linguagens é fortemente tipada?',
       type: QuestionType.MULTIPLE_CHOICE,
+      topicId: topic.id,
       alternatives: {
         create: [
           { text: 'JavaScript', type: AlternativeType.TEXT, isCorrect: false },
@@ -57,10 +84,11 @@ async function main() {
   });
 
   // Question 2: True/False
-  await prisma.question.create({
+  const question2 = await prisma.question.create({
     data: {
       text: 'O Sol é uma estrela?',
       type: QuestionType.TRUE_FALSE,
+      topicId: topic.id,
       alternatives: {
         create: [
           { text: 'Verdadeiro', type: AlternativeType.TEXT, isCorrect: true },
@@ -68,6 +96,21 @@ async function main() {
         ],
       },
     },
+  });
+
+  await prisma.examQuestion.createMany({
+    data: [
+      {
+        examId: exam.id,
+        questionId: question1.id,
+        position: 1,
+      },
+      {
+        examId: exam.id,
+        questionId: question2.id,
+        position: 2,
+      },
+    ],
   });
 
   console.log('Seed finished.');

@@ -17,13 +17,24 @@ export class QuestionsService {
     return authUser.role === UserRole.admin;
   }
 
-  private async ensureExamAccess(
-    examId: string,
+  private async ensureTopicAccess(
+    topicId: string,
     authUser: AuthTokenPayload,
   ): Promise<void> {
-    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
-    if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
-      throw new NotFoundException(`Exam with ID ${examId} not found`);
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      include: {
+        discipline: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (
+      !topic ||
+      (!this.isAdmin(authUser) && topic.discipline.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Topic with ID ${topicId} not found`);
     }
   }
 
@@ -31,7 +42,7 @@ export class QuestionsService {
     createQuestionDto: CreateQuestionDto,
     authUser: AuthTokenPayload,
   ): Promise<QuestionEntity> {
-    await this.ensureExamAccess(createQuestionDto.examId, authUser);
+    await this.ensureTopicAccess(createQuestionDto.topicId, authUser);
 
     const question = await this.prisma.question.create({
       data: createQuestionDto,
@@ -45,8 +56,10 @@ export class QuestionsService {
       where: this.isAdmin(authUser)
         ? undefined
         : {
-            exam: {
-              userId: authUser.id,
+            topic: {
+              discipline: {
+                userId: authUser.id,
+              },
             },
           },
       include: { alternatives: true },
@@ -60,13 +73,22 @@ export class QuestionsService {
   ): Promise<QuestionEntity> {
     const question = await this.prisma.question.findUnique({
       where: { id },
-      include: { alternatives: true, exam: true },
+      include: {
+        alternatives: true,
+        topic: {
+          include: {
+            discipline: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
     });
 
     if (
       !question ||
       (!this.isAdmin(authUser) &&
-        (!question.exam || question.exam.userId !== authUser.id))
+        question.topic.discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(`Question with ID ${id} not found`);
     }
@@ -81,8 +103,8 @@ export class QuestionsService {
   ): Promise<QuestionEntity> {
     await this.findOne(id, authUser);
 
-    if (updateQuestionDto.examId) {
-      await this.ensureExamAccess(updateQuestionDto.examId, authUser);
+    if (updateQuestionDto.topicId) {
+      await this.ensureTopicAccess(updateQuestionDto.topicId, authUser);
     }
 
     const question = await this.prisma.question.update({

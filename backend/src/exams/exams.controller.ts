@@ -11,6 +11,7 @@ import {
 import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
+import { AddExamQuestionDto } from './dto/add-exam-question.dto';
 import {
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
@@ -54,5 +55,25 @@ export class ExamsController {
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.examsService.remove(id, authUser);
+  }
+
+  @Post(':id/questions')
+  addQuestion(
+    @Param('id') id: string,
+    @Body() addExamQuestionDto: AddExamQuestionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
+    return this.examsService.addQuestion(id, addExamQuestionDto, authUser);
+  }
+
+  @Delete(':id/questions/:questionId')
+  removeQuestion(
+    @Param('id') id: string,
+    @Param('questionId') questionId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
+    return this.examsService.removeQuestion(id, questionId, authUser);
   }
 }

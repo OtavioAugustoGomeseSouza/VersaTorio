@@ -1,7 +1,7 @@
-import { QuestionEntity } from '../../questions/entities/question.entity';
-import { SubjectEntity } from '../../subject/entities/subject.entity';
-import { UserEntity } from '../../users/entities/user.entity';
-import { ExamVersionEntity } from '../../exam-versions/entities/exam-version.entity';
+import type { DisciplineEntity } from '../../disciplines/entities/discipline.entity';
+import type { UserEntity } from '../../users/entities/user.entity';
+import type { ExamVersionEntity } from '../../exam-versions/entities/exam-version.entity';
+import type { ExamQuestionEntity } from './exam-question.entity';
 
 export class ExamEntity {
   id: string;
@@ -10,10 +10,10 @@ export class ExamEntity {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
-  subjectId: string;
+  disciplineId: string;
 
   user?: UserEntity;
-  questions?: QuestionEntity[];
-  subject?: SubjectEntity;
+  examQuestions?: ExamQuestionEntity[];
+  discipline?: DisciplineEntity;
   versions?: ExamVersionEntity[];
 }

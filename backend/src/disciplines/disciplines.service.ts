@@ -1,0 +1,105 @@
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateDisciplineDto } from './dto/create-discipline.dto';
+import { UpdateDisciplineDto } from './dto/update-discipline.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { DisciplineEntity } from './entities/discipline.entity';
+import { plainToInstance } from 'class-transformer';
+import {
+  AuthTokenPayload,
+  UserRole,
+} from '../auth/interfaces/auth-token-payload.interface';
+
+@Injectable()
+export class DisciplinesService {
+  constructor(private prisma: PrismaService) {}
+
+  private isAdmin(authUser: AuthTokenPayload): boolean {
+    return authUser.role === UserRole.admin;
+  }
+
+  async create(
+    createDisciplineDto: CreateDisciplineDto,
+    authUser: AuthTokenPayload,
+  ): Promise<DisciplineEntity> {
+    const existingDiscipline = await this.prisma.discipline.findFirst({
+      where: { userId: authUser.id, name: createDisciplineDto.name },
+    });
+    if (existingDiscipline) {
+      throw new ConflictException(
+        `Discipline with name "${createDisciplineDto.name}" already exists`,
+      );
+    }
+
+    const discipline = await this.prisma.discipline.create({
+      data: { ...createDisciplineDto, userId: authUser.id },
+    });
+    return plainToInstance(DisciplineEntity, discipline);
+  }
+
+  async findAll(authUser: AuthTokenPayload): Promise<DisciplineEntity[]> {
+    const disciplines = await this.prisma.discipline.findMany({
+      where: this.isAdmin(authUser) ? undefined : { userId: authUser.id },
+    });
+    return plainToInstance(DisciplineEntity, disciplines);
+  }
+
+  async findOne(
+    id: string,
+    authUser: AuthTokenPayload,
+  ): Promise<DisciplineEntity> {
+    const discipline = await this.prisma.discipline.findUnique({
+      where: { id },
+    });
+    if (
+      !discipline ||
+      (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Discipline with ID ${id} not found`);
+    }
+    return plainToInstance(DisciplineEntity, discipline);
+  }
+
+  async update(
+    id: string,
+    updateDisciplineDto: UpdateDisciplineDto,
+    authUser: AuthTokenPayload,
+  ): Promise<DisciplineEntity> {
+    const currentDiscipline = await this.findOne(id, authUser);
+
+    if (updateDisciplineDto.name) {
+      const existingDiscipline = await this.prisma.discipline.findFirst({
+        where: {
+          userId: currentDiscipline.userId,
+          name: updateDisciplineDto.name,
+          id: { not: id },
+        },
+      });
+      if (existingDiscipline) {
+        throw new ConflictException(
+          `Discipline with name "${updateDisciplineDto.name}" already exists`,
+        );
+      }
+    }
+
+    const discipline = await this.prisma.discipline.update({
+      where: { id },
+      data: updateDisciplineDto,
+    });
+    return plainToInstance(DisciplineEntity, discipline);
+  }
+
+  async remove(
+    id: string,
+    authUser: AuthTokenPayload,
+  ): Promise<DisciplineEntity> {
+    await this.findOne(id, authUser);
+    const discipline = await this.prisma.discipline.delete({
+      where: { id },
+    });
+    return plainToInstance(DisciplineEntity, discipline);
+  }
+}

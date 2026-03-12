@@ -23,53 +23,85 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  name      String?
-  email     String    @unique
-  password  String
-  role      Role      @default(USER)
-  subjects  Subject[]
-  exams     Exam[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String       @id @default(uuid())
+  name        String?
+  email       String       @unique
+  password    String
+  role        Role         @default(USER)
+  disciplines Discipline[]
+  exams       Exam[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
-model Subject {
+model Discipline {
   id        String   @id @default(uuid())
   name      String
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  exams Exam[]
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exams  Exam[]
+  topics Topic[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Subject")
+}
+
+model Topic {
+  id           String   @id @default(uuid())
+  name         String
+  disciplineId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  questions  Question[]
+
+  @@unique([disciplineId, name])
 }
 
 model Exam {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userId      String
-  subjectId   String
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  userId       String
+  disciplineId String   @map("subjectId")
 
-  questions Question[]
-  versions  ExamVersion[]
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  examQuestions ExamQuestion[]
+  versions      ExamVersion[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discipline    Discipline     @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
 }
 
 model Question {
-  id           String        @id @default(uuid())
-  text         String
-  type         QuestionType
-  alternatives Alternative[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  examId       String?
+  id            String         @id @default(uuid())
+  text          String
+  type          QuestionType
+  topicId       String
+  alternatives  Alternative[]
+  examQuestions ExamQuestion[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  exam Exam? @relation(fields: [examId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model ExamQuestion {
+  id         String   @id @default(uuid())
+  examId     String
+  questionId String
+  position   Int?
+  createdAt  DateTime @default(now())
+
+  exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, questionId])
+  @@index([questionId])
+  @@index([examId, position])
 }
 
 model ExamVersion {

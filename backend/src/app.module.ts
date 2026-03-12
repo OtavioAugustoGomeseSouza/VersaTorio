@@ -9,9 +9,10 @@ import { UsersModule } from './users/users.module';
 import { AlternativesModule } from './alternatives/alternatives.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ExamsModule } from './exams/exams.module';
-import { SubjectModule } from './subject/subject.module';
+import { DisciplinesModule } from './disciplines/disciplines.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
 import { ExamVersionsModule } from './exam-versions/exam-versions.module';
+import { TopicsModule } from './topics/topics.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { ExamVersionsModule } from './exam-versions/exam-versions.module';
     AlternativesModule,
     QuestionsModule,
     ExamsModule,
-    SubjectModule,
+    DisciplinesModule,
+    TopicsModule,
     ExamVersionsModule,
   ],
   controllers: [AppController],

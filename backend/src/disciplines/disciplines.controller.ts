@@ -8,51 +8,51 @@ import {
   Delete,
   Req,
 } from '@nestjs/common';
-import { SubjectService } from './subject.service';
-import { CreateSubjectDto } from './dto/create-subject.dto';
-import { UpdateSubjectDto } from './dto/update-subject.dto';
+import { DisciplinesService } from './disciplines.service';
+import { CreateDisciplineDto } from './dto/create-discipline.dto';
+import { UpdateDisciplineDto } from './dto/update-discipline.dto';
 import {
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
 
-@Controller('subject')
-export class SubjectController {
-  constructor(private readonly subjectService: SubjectService) {}
+@Controller(['disciplines', 'subject'])
+export class DisciplinesController {
+  constructor(private readonly disciplinesService: DisciplinesService) {}
 
   @Post()
   create(
-    @Body() createSubjectDto: CreateSubjectDto,
+    @Body() createDisciplineDto: CreateDisciplineDto,
     @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
-    return this.subjectService.create(createSubjectDto, authUser);
+    return this.disciplinesService.create(createDisciplineDto, authUser);
   }
 
   @Get()
   findAll(@Req() request: AuthenticatedRequest) {
     const authUser = request.user;
-    return this.subjectService.findAll(authUser);
+    return this.disciplinesService.findAll(authUser);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
-    return this.subjectService.findOne(id, authUser);
+    return this.disciplinesService.findOne(id, authUser);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateSubjectDto: UpdateSubjectDto,
+    @Body() updateDisciplineDto: UpdateDisciplineDto,
     @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
-    return this.subjectService.update(id, updateSubjectDto, authUser);
+    return this.disciplinesService.update(id, updateDisciplineDto, authUser);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
-    return this.subjectService.remove(id, authUser);
+    return this.disciplinesService.remove(id, authUser);
   }
 }
