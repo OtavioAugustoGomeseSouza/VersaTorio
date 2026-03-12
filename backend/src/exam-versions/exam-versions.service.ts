@@ -1,13 +1,38 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateExamVersionDto } from './dto/create-exam-version.dto';
-import { UpdateExamVersionDto } from './dto/update-exam-version.dto';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { QuestionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  AuthTokenPayload,
+  UserRole,
+} from '../auth/interfaces/auth-token-payload.interface';
+
+type ExamVersionOrderData = {
+  questions: Array<{
+    questionId: string;
+    position: number;
+    alternatives: Array<{
+      alternativeId: string;
+      position: number;
+    }>;
+  }>;
+};
+type AccessibleExam = Awaited<
+  ReturnType<ExamVersionsService['getAccessibleExam']>
+>;
 
 @Injectable()
 export class ExamVersionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async generate(examId: string, name: string) {
+  private isAdmin(authUser: AuthTokenPayload): boolean {
+    return authUser.role === UserRole.admin;
+  }
+
+  private async getAccessibleExam(examId: string, authUser: AuthTokenPayload) {
     const exam = await this.prisma.exam.findUnique({
       where: { id: examId },
       include: {
@@ -19,16 +44,66 @@ export class ExamVersionsService {
       },
     });
 
-    if (!exam) {
+    if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
       throw new NotFoundException('Exam not found');
     }
 
+    return exam;
+  }
+
+  private validateExamQuestionsForGeneration(exam: AccessibleExam): void {
+    if (exam.questions.length === 0) {
+      throw new BadRequestException(
+        'Cannot generate exam version without questions',
+      );
+    }
+
+    for (const question of exam.questions) {
+      const totalAlternatives = question.alternatives.length;
+      const correctAlternatives = question.alternatives.filter(
+        (alternative) => alternative.isCorrect,
+      ).length;
+
+      if (totalAlternatives < 2) {
+        throw new BadRequestException(
+          `Question ${question.id} must have at least 2 alternatives`,
+        );
+      }
+
+      if (question.type === QuestionType.TRUE_FALSE && totalAlternatives !== 2) {
+        throw new BadRequestException(
+          `Question ${question.id} must have exactly 2 alternatives for TRUE_FALSE`,
+        );
+      }
+
+      if (correctAlternatives !== 1) {
+        throw new BadRequestException(
+          `Question ${question.id} must have exactly 1 correct alternative`,
+        );
+      }
+    }
+  }
+
+  async generate(
+    examId: string,
+    name: string,
+    authUser: AuthTokenPayload,
+  ) {
+    const exam = await this.getAccessibleExam(examId, authUser);
+    this.validateExamQuestionsForGeneration(exam);
+
     const shuffledQuestions = this.shuffle([...exam.questions]);
 
-    const orderData = {
-      questions: shuffledQuestions.map((q) => ({
-        id: q.id,
-        alternatives: this.shuffle([...q.alternatives]).map((a) => a.id),
+    const orderData: ExamVersionOrderData = {
+      questions: shuffledQuestions.map((question, questionIndex) => ({
+        questionId: question.id,
+        position: questionIndex + 1,
+        alternatives: this.shuffle([...question.alternatives]).map(
+          (alternative, alternativeIndex) => ({
+            alternativeId: alternative.id,
+            position: alternativeIndex + 1,
+          }),
+        ),
       })),
     };
 
@@ -49,17 +124,37 @@ export class ExamVersionsService {
     return array;
   }
 
-  findAll() {
-    return this.prisma.examVersion.findMany();
-  }
-
-  findOne(id: string) {
-    return this.prisma.examVersion.findUnique({
-      where: { id },
+  findAll(authUser: AuthTokenPayload) {
+    return this.prisma.examVersion.findMany({
+      where: this.isAdmin(authUser)
+        ? undefined
+        : {
+            exam: {
+              userId: authUser.id,
+            },
+          },
     });
   }
 
-  async remove(id: string) {
+  async findOne(id: string, authUser: AuthTokenPayload) {
+    const examVersion = await this.prisma.examVersion.findUnique({
+      where: { id },
+      include: { exam: true },
+    });
+
+    if (
+      !examVersion ||
+      (!this.isAdmin(authUser) && examVersion.exam.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Exam version with ID ${id} not found`);
+    }
+
+    return examVersion;
+  }
+
+  async remove(id: string, authUser: AuthTokenPayload) {
+    await this.findOne(id, authUser);
+
     return this.prisma.examVersion.delete({
       where: { id },
     });

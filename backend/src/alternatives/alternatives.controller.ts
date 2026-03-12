@@ -12,7 +12,6 @@ import { AlternativesService } from './alternatives.service';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import {
-  AuthTokenPayload,
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
 

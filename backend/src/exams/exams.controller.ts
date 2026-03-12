@@ -12,7 +12,6 @@ import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import {
-  AuthTokenPayload,
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
 

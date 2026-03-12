@@ -12,7 +12,6 @@ import { QuestionsService } from './questions.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import {
-  AuthTokenPayload,
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
 

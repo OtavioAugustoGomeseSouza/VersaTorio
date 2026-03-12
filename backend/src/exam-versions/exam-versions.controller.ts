@@ -3,38 +3,48 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { ExamVersionsService } from './exam-versions.service';
 import { CreateExamVersionDto } from './dto/create-exam-version.dto';
-import { UpdateExamVersionDto } from './dto/update-exam-version.dto';
+import {
+  type AuthenticatedRequest,
+} from '../auth/interfaces/auth-token-payload.interface';
 
 @Controller('exam-versions')
 export class ExamVersionsController {
   constructor(private readonly examVersionsService: ExamVersionsService) {}
 
   @Post('generate')
-  generate(@Body() createExamVersionDto: CreateExamVersionDto) {
+  generate(
+    @Body() createExamVersionDto: CreateExamVersionDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
     return this.examVersionsService.generate(
       createExamVersionDto.examId,
       createExamVersionDto.name,
+      authUser,
     );
   }
 
   @Get()
-  findAll() {
-    return this.examVersionsService.findAll();
+  findAll(@Req() request: AuthenticatedRequest) {
+    const authUser = request.user;
+    return this.examVersionsService.findAll(authUser);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.examVersionsService.findOne(id);
+  findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    const authUser = request.user;
+    return this.examVersionsService.findOne(id, authUser);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.examVersionsService.remove(id);
+  remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    const authUser = request.user;
+    return this.examVersionsService.remove(id, authUser);
   }
 }

@@ -12,7 +12,6 @@ import { SubjectService } from './subject.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import {
-  AuthTokenPayload,
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
 

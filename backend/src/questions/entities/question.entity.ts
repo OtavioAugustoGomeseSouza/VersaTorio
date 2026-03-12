@@ -12,7 +12,7 @@ export class QuestionEntity {
   type: QuestionType;
   createdAt: Date;
   updatedAt: Date;
-  examId: string;
+  examId?: string;
 
   exam?: ExamEntity;
   alternatives?: AlternativeEntity[];

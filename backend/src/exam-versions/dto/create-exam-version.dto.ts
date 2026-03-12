@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
 
 export class CreateExamVersionDto {
   @IsString()
@@ -8,7 +8,4 @@ export class CreateExamVersionDto {
   @IsUUID()
   @IsNotEmpty()
   examId: string;
-
-  @IsOptional()
-  orderData?: any;
 }

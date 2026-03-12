@@ -4,25 +4,42 @@ import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { AlternativeEntity } from './entities/alternative.etity';
 import { plainToInstance } from 'class-transformer';
-import { AuthTokenPayload } from '../auth/interfaces/auth-token-payload.interface';
+import {
+  AuthTokenPayload,
+  UserRole,
+} from '../auth/interfaces/auth-token-payload.interface';
 
 @Injectable()
 export class AlternativesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(
-    createAlternativeDto: CreateAlternativeDto,
+  private isAdmin(authUser: AuthTokenPayload): boolean {
+    return authUser.role === UserRole.admin;
+  }
+
+  private async ensureQuestionAccess(
+    questionId: string,
     authUser: AuthTokenPayload,
-  ): Promise<AlternativeEntity> {
-    const { questionId } = createAlternativeDto;
+  ): Promise<void> {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: { exam: true },
     });
 
-    if (!question || (question.exam && question.exam.userId !== authUser.id)) {
+    if (
+      !question ||
+      (!this.isAdmin(authUser) &&
+        (!question.exam || question.exam.userId !== authUser.id))
+    ) {
       throw new NotFoundException(`Question with ID ${questionId} not found`);
     }
+  }
+
+  async create(
+    createAlternativeDto: CreateAlternativeDto,
+    authUser: AuthTokenPayload,
+  ): Promise<AlternativeEntity> {
+    await this.ensureQuestionAccess(createAlternativeDto.questionId, authUser);
 
     const alternative = await this.prisma.alternative.create({
       data: createAlternativeDto,
@@ -32,13 +49,15 @@ export class AlternativesService {
 
   async findAll(authUser: AuthTokenPayload): Promise<AlternativeEntity[]> {
     const alternatives = await this.prisma.alternative.findMany({
-      where: {
-        question: {
-          exam: {
-            userId: authUser.id,
+      where: this.isAdmin(authUser)
+        ? undefined
+        : {
+            question: {
+              exam: {
+                userId: authUser.id,
+              },
+            },
           },
-        },
-      },
     });
     return plainToInstance(AlternativeEntity, alternatives);
   }
@@ -58,8 +77,9 @@ export class AlternativesService {
 
     if (
       !alternative ||
-      (alternative.question.exam &&
-        alternative.question.exam.userId !== authUser.id)
+      (!this.isAdmin(authUser) &&
+        (!alternative.question.exam ||
+          alternative.question.exam.userId !== authUser.id))
     ) {
       throw new NotFoundException(`Alternative with ID ${id} not found`);
     }
@@ -75,18 +95,10 @@ export class AlternativesService {
     await this.findOne(id, authUser);
 
     if (updateAlternativeDto.questionId) {
-      const question = await this.prisma.question.findUnique({
-        where: { id: updateAlternativeDto.questionId },
-        include: { exam: true },
-      });
-      if (
-        !question ||
-        (question.exam && question.exam.userId !== authUser.id)
-      ) {
-        throw new NotFoundException(
-          `Question with ID ${updateAlternativeDto.questionId} not found`,
-        );
-      }
+      await this.ensureQuestionAccess(
+        updateAlternativeDto.questionId,
+        authUser,
+      );
     }
 
     const alternative = await this.prisma.alternative.update({

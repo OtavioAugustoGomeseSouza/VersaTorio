@@ -1,7 +1,6 @@
 import {
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
@@ -16,6 +15,6 @@ export class CreateQuestionDto {
   type: QuestionType;
 
   @IsUUID()
-  @IsOptional()
-  examId?: string;
+  @IsNotEmpty()
+  examId: string;
 }

@@ -1,19 +1,39 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubjectEntity } from './entities/subject.entity';
 import { plainToInstance } from 'class-transformer';
-import { AuthTokenPayload } from '../auth/interfaces/auth-token-payload.interface';
+import {
+  AuthTokenPayload,
+  UserRole,
+} from '../auth/interfaces/auth-token-payload.interface';
 
 @Injectable()
 export class SubjectService {
   constructor(private prisma: PrismaService) {}
 
+  private isAdmin(authUser: AuthTokenPayload): boolean {
+    return authUser.role === UserRole.admin;
+  }
+
   async create(
     createSubjectDto: CreateSubjectDto,
     authUser: AuthTokenPayload,
   ): Promise<SubjectEntity> {
+    const existingSubject = await this.prisma.subject.findFirst({
+      where: { userId: authUser.id, name: createSubjectDto.name },
+    });
+    if (existingSubject) {
+      throw new ConflictException(
+        `Subject with name "${createSubjectDto.name}" already exists`,
+      );
+    }
+
     const subject = await this.prisma.subject.create({
       data: { ...createSubjectDto, userId: authUser.id },
     });
@@ -22,7 +42,7 @@ export class SubjectService {
 
   async findAll(authUser: AuthTokenPayload): Promise<SubjectEntity[]> {
     const subjects = await this.prisma.subject.findMany({
-      where: { userId: authUser.id },
+      where: this.isAdmin(authUser) ? undefined : { userId: authUser.id },
     });
     return plainToInstance(SubjectEntity, subjects);
   }
@@ -34,7 +54,7 @@ export class SubjectService {
     const subject = await this.prisma.subject.findUnique({
       where: { id },
     });
-    if (!subject || subject.userId !== authUser.id)
+    if (!subject || (!this.isAdmin(authUser) && subject.userId !== authUser.id))
       throw new NotFoundException(`Subject with ID ${id} not found`);
     return plainToInstance(SubjectEntity, subject);
   }
@@ -44,7 +64,23 @@ export class SubjectService {
     updateSubjectDto: UpdateSubjectDto,
     authUser: AuthTokenPayload,
   ): Promise<SubjectEntity> {
-    await this.findOne(id, authUser);
+    const currentSubject = await this.findOne(id, authUser);
+
+    if (updateSubjectDto.name) {
+      const existingSubject = await this.prisma.subject.findFirst({
+        where: {
+          userId: currentSubject.userId,
+          name: updateSubjectDto.name,
+          id: { not: id },
+        },
+      });
+      if (existingSubject) {
+        throw new ConflictException(
+          `Subject with name "${updateSubjectDto.name}" already exists`,
+        );
+      }
+    }
+
     const subject = await this.prisma.subject.update({
       where: { id },
       data: updateSubjectDto,
