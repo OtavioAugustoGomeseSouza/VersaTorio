@@ -8,11 +8,25 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingOverview, setLoadingOverview] = useState(false);
+  const [loadingCreateDiscipline, setLoadingCreateDiscipline] = useState(false);
+  const [loadingCreateTopic, setLoadingCreateTopic] = useState(false);
+  const [loadingCreateQuestion, setLoadingCreateQuestion] = useState(false);
+  const [loadingCreateAlternative, setLoadingCreateAlternative] = useState(false);
   const [message, setMessage] = useState('');
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
   const [questions, setQuestions] = useState([]);
   const [exams, setExams] = useState([]);
+  const [disciplineName, setDisciplineName] = useState('');
+  const [topicDisciplineId, setTopicDisciplineId] = useState('');
+  const [topicName, setTopicName] = useState('');
+  const [questionText, setQuestionText] = useState('');
+  const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
+  const [questionTopicId, setQuestionTopicId] = useState('');
+  const [alternativeQuestionId, setAlternativeQuestionId] = useState('');
+  const [alternativeText, setAlternativeText] = useState('');
+  const [alternativeType, setAlternativeType] = useState('TEXT');
+  const [alternativeIsCorrect, setAlternativeIsCorrect] = useState(false);
 
   const allTopics = useMemo(
     () => Object.values(topicsByDiscipline).flat(),
@@ -54,6 +68,31 @@ export default function App() {
     }
 
     return data ?? [];
+  }
+
+  async function postWithAuth(path, currentToken, body) {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${currentToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await parseJson(response);
+    if (!response.ok) {
+      const backendMessage = Array.isArray(data?.message)
+        ? data.message.join(', ')
+        : data?.message;
+      const error = new Error(
+        backendMessage ?? `Falha ao enviar ${path} (${response.status})`,
+      );
+      error.status = response.status;
+      throw error;
+    }
+
+    return data;
   }
 
   async function loadOverview(currentToken) {
@@ -119,6 +158,113 @@ export default function App() {
     setTopicsByDiscipline({});
     setQuestions([]);
     setExams([]);
+    setDisciplineName('');
+    setTopicDisciplineId('');
+    setTopicName('');
+    setQuestionText('');
+    setQuestionType('MULTIPLE_CHOICE');
+    setQuestionTopicId('');
+    setAlternativeQuestionId('');
+    setAlternativeText('');
+    setAlternativeType('TEXT');
+    setAlternativeIsCorrect(false);
+  }
+
+  async function handleCreateDiscipline(event) {
+    event.preventDefault();
+    if (!disciplineName.trim()) {
+      return;
+    }
+
+    setLoadingCreateDiscipline(true);
+    setMessage('');
+
+    try {
+      await postWithAuth('/disciplines', token, { name: disciplineName.trim() });
+      setDisciplineName('');
+      setMessage('Disciplina criada com sucesso');
+      await loadOverview(token);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao criar disciplina');
+    } finally {
+      setLoadingCreateDiscipline(false);
+    }
+  }
+
+  async function handleCreateTopic(event) {
+    event.preventDefault();
+    if (!topicName.trim() || !topicDisciplineId) {
+      return;
+    }
+
+    setLoadingCreateTopic(true);
+    setMessage('');
+
+    try {
+      await postWithAuth(`/disciplines/${topicDisciplineId}/topics`, token, {
+        name: topicName.trim(),
+      });
+      setTopicName('');
+      setMessage('Topico criado com sucesso');
+      await loadOverview(token);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao criar topico');
+    } finally {
+      setLoadingCreateTopic(false);
+    }
+  }
+
+  async function handleCreateQuestion(event) {
+    event.preventDefault();
+    if (!questionText.trim() || !questionTopicId) {
+      return;
+    }
+
+    setLoadingCreateQuestion(true);
+    setMessage('');
+
+    try {
+      await postWithAuth('/questions', token, {
+        text: questionText.trim(),
+        type: questionType,
+        topicId: questionTopicId,
+      });
+      setQuestionText('');
+      setMessage('Questao criada com sucesso');
+      await loadOverview(token);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao criar questao');
+    } finally {
+      setLoadingCreateQuestion(false);
+    }
+  }
+
+  async function handleCreateAlternative(event) {
+    event.preventDefault();
+    if (!alternativeQuestionId || !alternativeText.trim()) {
+      return;
+    }
+
+    setLoadingCreateAlternative(true);
+    setMessage('');
+
+    try {
+      await postWithAuth('/alternatives', token, {
+        questionId: alternativeQuestionId,
+        text: alternativeText.trim(),
+        type: alternativeType,
+        isCorrect: alternativeIsCorrect,
+      });
+      setAlternativeText('');
+      setAlternativeType('TEXT');
+      setAlternativeIsCorrect(false);
+      setMessage('Alternativa criada com sucesso');
+      await loadOverview(token);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao criar alternativa');
+    } finally {
+      setLoadingCreateAlternative(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -162,6 +308,46 @@ export default function App() {
     loadOverview(token);
   }, [token]);
 
+  useEffect(() => {
+    if (disciplines.length === 0) {
+      setTopicDisciplineId('');
+      return;
+    }
+
+    const disciplineExists = disciplines.some(
+      (discipline) => discipline.id === topicDisciplineId,
+    );
+    if (!disciplineExists) {
+      setTopicDisciplineId(disciplines[0].id);
+    }
+  }, [disciplines, topicDisciplineId]);
+
+  useEffect(() => {
+    if (allTopics.length === 0) {
+      setQuestionTopicId('');
+      return;
+    }
+
+    const topicExists = allTopics.some((topic) => topic.id === questionTopicId);
+    if (!topicExists) {
+      setQuestionTopicId(allTopics[0].id);
+    }
+  }, [allTopics, questionTopicId]);
+
+  useEffect(() => {
+    if (questions.length === 0) {
+      setAlternativeQuestionId('');
+      return;
+    }
+
+    const questionExists = questions.some(
+      (question) => question.id === alternativeQuestionId,
+    );
+    if (!questionExists) {
+      setAlternativeQuestionId(questions[0].id);
+    }
+  }, [questions, alternativeQuestionId]);
+
   if (token) {
     return (
       <main>
@@ -175,6 +361,175 @@ export default function App() {
         </button>
 
         {message ? <p>{message}</p> : null}
+
+        <section>
+          <h2>Criar Disciplina</h2>
+          <form onSubmit={handleCreateDiscipline}>
+            <label htmlFor="disciplineName">Nome da disciplina</label>
+            <input
+              id="disciplineName"
+              type="text"
+              value={disciplineName}
+              onChange={(event) => setDisciplineName(event.target.value)}
+              required
+            />
+            <button type="submit" disabled={loadingCreateDiscipline}>
+              {loadingCreateDiscipline ? 'Criando...' : 'Criar disciplina'}
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Criar Topico</h2>
+          <form onSubmit={handleCreateTopic}>
+            <label htmlFor="topicDiscipline">Disciplina</label>
+            <select
+              id="topicDiscipline"
+              value={topicDisciplineId}
+              onChange={(event) => setTopicDisciplineId(event.target.value)}
+              disabled={disciplines.length === 0}
+              required
+            >
+              {disciplines.length === 0 ? (
+                <option value="">Cadastre uma disciplina primeiro</option>
+              ) : (
+                disciplines.map((discipline) => (
+                  <option key={discipline.id} value={discipline.id}>
+                    {discipline.name}
+                  </option>
+                ))
+              )}
+            </select>
+
+            <label htmlFor="topicName">Nome do topico</label>
+            <input
+              id="topicName"
+              type="text"
+              value={topicName}
+              onChange={(event) => setTopicName(event.target.value)}
+              required
+            />
+
+            <button
+              type="submit"
+              disabled={loadingCreateTopic || disciplines.length === 0}
+            >
+              {loadingCreateTopic ? 'Criando...' : 'Criar topico'}
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Criar Questao</h2>
+          <form onSubmit={handleCreateQuestion}>
+            <label htmlFor="questionTopic">Topico</label>
+            <select
+              id="questionTopic"
+              value={questionTopicId}
+              onChange={(event) => setQuestionTopicId(event.target.value)}
+              disabled={allTopics.length === 0}
+              required
+            >
+              {allTopics.length === 0 ? (
+                <option value="">Cadastre um topico primeiro</option>
+              ) : (
+                allTopics.map((topic) => (
+                  <option key={topic.id} value={topic.id}>
+                    {topic.name}
+                  </option>
+                ))
+              )}
+            </select>
+
+            <label htmlFor="questionType">Tipo</label>
+            <select
+              id="questionType"
+              value={questionType}
+              onChange={(event) => setQuestionType(event.target.value)}
+              required
+            >
+              <option value="MULTIPLE_CHOICE">MULTIPLE_CHOICE</option>
+              <option value="TRUE_FALSE">TRUE_FALSE</option>
+            </select>
+
+            <label htmlFor="questionText">Texto da questao</label>
+            <textarea
+              id="questionText"
+              value={questionText}
+              onChange={(event) => setQuestionText(event.target.value)}
+              rows={4}
+              required
+            />
+
+            <button
+              type="submit"
+              disabled={loadingCreateQuestion || allTopics.length === 0}
+            >
+              {loadingCreateQuestion ? 'Criando...' : 'Criar questao'}
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Criar Alternativa</h2>
+          <form onSubmit={handleCreateAlternative}>
+            <label htmlFor="alternativeQuestion">Questao</label>
+            <select
+              id="alternativeQuestion"
+              value={alternativeQuestionId}
+              onChange={(event) => setAlternativeQuestionId(event.target.value)}
+              disabled={questions.length === 0}
+              required
+            >
+              {questions.length === 0 ? (
+                <option value="">Cadastre uma questao primeiro</option>
+              ) : (
+                questions.map((question) => (
+                  <option key={question.id} value={question.id}>
+                    {question.text}
+                  </option>
+                ))
+              )}
+            </select>
+
+            <label htmlFor="alternativeType">Tipo da alternativa</label>
+            <select
+              id="alternativeType"
+              value={alternativeType}
+              onChange={(event) => setAlternativeType(event.target.value)}
+              required
+            >
+              <option value="TEXT">TEXT</option>
+              <option value="IMAGE">IMAGE</option>
+            </select>
+
+            <label htmlFor="alternativeText">Texto da alternativa</label>
+            <input
+              id="alternativeText"
+              type="text"
+              value={alternativeText}
+              onChange={(event) => setAlternativeText(event.target.value)}
+              required
+            />
+
+            <label htmlFor="alternativeCorrect">
+              <input
+                id="alternativeCorrect"
+                type="checkbox"
+                checked={alternativeIsCorrect}
+                onChange={(event) => setAlternativeIsCorrect(event.target.checked)}
+              />
+              Alternativa correta
+            </label>
+
+            <button
+              type="submit"
+              disabled={loadingCreateAlternative || questions.length === 0}
+            >
+              {loadingCreateAlternative ? 'Criando...' : 'Criar alternativa'}
+            </button>
+          </form>
+        </section>
 
         <p>Total de disciplinas: {disciplines.length}</p>
         <p>Total de topicos: {allTopics.length}</p>
