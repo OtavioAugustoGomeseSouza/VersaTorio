@@ -5,7 +5,6 @@ export class ExamQuestionEntity {
   id: string;
   examId: string;
   questionId: string;
-  position?: number;
   createdAt: Date;
 
   exam?: ExamEntity;

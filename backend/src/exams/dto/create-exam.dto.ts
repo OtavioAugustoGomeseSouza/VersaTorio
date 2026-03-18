@@ -1,5 +1,12 @@
-import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateExamDto {
   @IsString()
@@ -10,12 +17,9 @@ export class CreateExamDto {
   @IsOptional()
   description?: string;
 
-  @IsUUID()
-  @IsNotEmpty()
-  @Transform(({ value, obj }) => value ?? obj.subjectId)
-  disciplineId: string;
-
-  @IsUUID()
-  @IsOptional()
-  subjectId?: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  questionIds: string[];
 }

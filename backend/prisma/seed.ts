@@ -103,12 +103,10 @@ async function main() {
       {
         examId: exam.id,
         questionId: question1.id,
-        position: 1,
       },
       {
         examId: exam.id,
         questionId: question2.id,
-        position: 2,
       },
     ],
   });

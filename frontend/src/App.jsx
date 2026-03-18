@@ -12,6 +12,7 @@ export default function App() {
   const [loadingCreateTopic, setLoadingCreateTopic] = useState(false);
   const [loadingCreateQuestion, setLoadingCreateQuestion] = useState(false);
   const [loadingCreateAlternative, setLoadingCreateAlternative] = useState(false);
+  const [loadingCreateExam, setLoadingCreateExam] = useState(false);
   const [message, setMessage] = useState('');
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
@@ -27,6 +28,9 @@ export default function App() {
   const [alternativeText, setAlternativeText] = useState('');
   const [alternativeType, setAlternativeType] = useState('TEXT');
   const [alternativeIsCorrect, setAlternativeIsCorrect] = useState(false);
+  const [examName, setExamName] = useState('');
+  const [examDescription, setExamDescription] = useState('');
+  const [examQuestionIds, setExamQuestionIds] = useState([]);
 
   const allTopics = useMemo(
     () => Object.values(topicsByDiscipline).flat(),
@@ -168,6 +172,19 @@ export default function App() {
     setAlternativeText('');
     setAlternativeType('TEXT');
     setAlternativeIsCorrect(false);
+    setExamName('');
+    setExamDescription('');
+    setExamQuestionIds([]);
+  }
+
+  function handleToggleExamQuestion(questionId) {
+    setExamQuestionIds((currentQuestionIds) => {
+      if (currentQuestionIds.includes(questionId)) {
+        return currentQuestionIds.filter((id) => id !== questionId);
+      }
+
+      return [...currentQuestionIds, questionId];
+    });
   }
 
   async function handleCreateDiscipline(event) {
@@ -267,6 +284,33 @@ export default function App() {
     }
   }
 
+  async function handleCreateExam(event) {
+    event.preventDefault();
+    if (!examName.trim() || examQuestionIds.length === 0) {
+      return;
+    }
+
+    setLoadingCreateExam(true);
+    setMessage('');
+
+    try {
+      await postWithAuth('/exams', token, {
+        name: examName.trim(),
+        description: examDescription.trim() || undefined,
+        questionIds: examQuestionIds,
+      });
+      setExamName('');
+      setExamDescription('');
+      setExamQuestionIds([]);
+      setMessage('Prova criada com sucesso');
+      await loadOverview(token);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao criar prova');
+    } finally {
+      setLoadingCreateExam(false);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setLoadingLogin(true);
@@ -347,6 +391,17 @@ export default function App() {
       setAlternativeQuestionId(questions[0].id);
     }
   }, [questions, alternativeQuestionId]);
+
+  useEffect(() => {
+    if (examQuestionIds.length === 0) {
+      return;
+    }
+
+    const validQuestionIds = new Set(questions.map((question) => question.id));
+    setExamQuestionIds((currentQuestionIds) =>
+      currentQuestionIds.filter((questionId) => validQuestionIds.has(questionId)),
+    );
+  }, [questions, examQuestionIds.length]);
 
   if (token) {
     return (
@@ -527,6 +582,69 @@ export default function App() {
               disabled={loadingCreateAlternative || questions.length === 0}
             >
               {loadingCreateAlternative ? 'Criando...' : 'Criar alternativa'}
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Criar Prova</h2>
+          <form onSubmit={handleCreateExam}>
+            <label htmlFor="examName">Nome da prova</label>
+            <input
+              id="examName"
+              type="text"
+              value={examName}
+              onChange={(event) => setExamName(event.target.value)}
+              required
+            />
+
+            <label htmlFor="examDescription">Descricao (opcional)</label>
+            <textarea
+              id="examDescription"
+              value={examDescription}
+              onChange={(event) => setExamDescription(event.target.value)}
+              rows={3}
+            />
+
+            <p>Selecione as questoes da prova</p>
+            {questions.length === 0 ? (
+              <p>Cadastre uma questao primeiro</p>
+            ) : (
+              <ul>
+                {questions.map((question) => {
+                  const topic = topicById[question.topicId];
+                  const discipline = disciplines.find(
+                    (disciplineItem) => disciplineItem.id === topic?.disciplineId,
+                  );
+
+                  return (
+                    <li key={question.id}>
+                      <label htmlFor={`exam-question-${question.id}`}>
+                        <input
+                          id={`exam-question-${question.id}`}
+                          type="checkbox"
+                          checked={examQuestionIds.includes(question.id)}
+                          onChange={() => handleToggleExamQuestion(question.id)}
+                        />
+                        {question.text} | Topico: {topic?.name ?? '-'} | Disciplina:{' '}
+                        {discipline?.name ?? '-'}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <p>Questoes selecionadas: {examQuestionIds.length}</p>
+            <button
+              type="submit"
+              disabled={
+                loadingCreateExam ||
+                questions.length === 0 ||
+                examQuestionIds.length === 0
+              }
+            >
+              {loadingCreateExam ? 'Criando...' : 'Criar prova'}
             </button>
           </form>
         </section>

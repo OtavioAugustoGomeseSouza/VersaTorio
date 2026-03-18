@@ -93,7 +93,6 @@ model ExamQuestion {
   id         String   @id @default(uuid())
   examId     String
   questionId String
-  position   Int?
   createdAt  DateTime @default(now())
 
   exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
@@ -101,7 +100,6 @@ model ExamQuestion {
 
   @@unique([examId, questionId])
   @@index([questionId])
-  @@index([examId, position])
 }
 
 model ExamVersion {

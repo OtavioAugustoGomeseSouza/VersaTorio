@@ -15,7 +15,18 @@ import {
 } from '../auth/interfaces/auth-token-payload.interface';
 import { AddExamQuestionDto } from './dto/add-exam-question.dto';
 import { ExamQuestionEntity } from './entities/exam-question.entity';
-import { Prisma } from '@prisma/client';
+import { Prisma, QuestionType } from '@prisma/client';
+
+type ExamVersionOrderData = {
+  questions: Array<{
+    questionId: string;
+    position: number;
+    alternatives: Array<{
+      alternativeId: string;
+      position: number;
+    }>;
+  }>;
+};
 
 @Injectable()
 export class ExamsService {
@@ -41,45 +52,150 @@ export class ExamsService {
     return exam;
   }
 
-  private async getAccessibleDiscipline(
-    disciplineId: string,
+
+  private async getQuestionsForExamCreation(
+    questionIds: string[],
     authUser: AuthTokenPayload,
-  ): Promise<{ id: string; userId: string }> {
-    const discipline = await this.prisma.discipline.findUnique({
-      where: { id: disciplineId },
-      select: { id: true, userId: true },
+  ): Promise<Array<{ id: string; topic: { discipline: { id: string; userId: string } } }>> {
+    const questions = await this.prisma.question.findMany({
+      where: { id: { in: questionIds } },
+      select: {
+        id: true,
+        topic: {
+          select: {
+            discipline: {
+              select: {
+                id: true,
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (
-      !discipline ||
-      (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
-    ) {
-      throw new NotFoundException(`Discipline with ID ${disciplineId} not found`);
+    if (questions.length !== questionIds.length) {
+      throw new NotFoundException('One or more questions were not found');
     }
 
-    return discipline;
+    if (
+      !this.isAdmin(authUser) &&
+      questions.some(
+        (question) => question.topic.discipline.userId !== authUser.id,
+      )
+    ) {
+      throw new NotFoundException('One or more questions were not found');
+    }
+
+    return questions;
+  }
+
+  private validateQuestionAlternativesForVersionCreation(
+    questions: Array<{
+      id: string;
+      type: QuestionType;
+      alternatives: Array<{ id: string; isCorrect: boolean }>;
+    }>,
+  ): void {
+    for (const question of questions) {
+      const totalAlternatives = question.alternatives.length;
+      const correctAlternatives = question.alternatives.filter(
+        (alternative) => alternative.isCorrect,
+      ).length;
+
+      if (totalAlternatives < 2) {
+        throw new BadRequestException(
+          `Question ${question.id} must have at least 2 alternatives`,
+        );
+      }
+
+      if (correctAlternatives < 1) {
+        throw new BadRequestException(
+          `Question ${question.id} must have at least 1 correct alternative`,
+        );
+      }
+    }
   }
 
   async create(
     createExamDto: CreateExamDto,
     authUser: AuthTokenPayload,
   ): Promise<ExamEntity> {
-    const discipline = await this.getAccessibleDiscipline(
-      createExamDto.disciplineId,
+    const questions = await this.getQuestionsForExamCreation(
+      createExamDto.questionIds,
       authUser,
     );
+    const discipline = questions[0].topic.discipline;
     const examOwnerId = this.isAdmin(authUser)
       ? discipline.userId
       : authUser.id;
 
-    const exam = await this.prisma.exam.create({
-      data: {
-        name: createExamDto.name,
-        description: createExamDto.description,
-        disciplineId: createExamDto.disciplineId,
-        userId: examOwnerId,
-      },
+    const exam = await this.prisma.$transaction(async (tx) => {
+      const createdExam = await tx.exam.create({
+        data: {
+          name: createExamDto.name,
+          description: createExamDto.description,
+          disciplineId: discipline.id,
+          userId: examOwnerId,
+        },
+      });
+
+      await tx.examQuestion.createMany({
+        data: createExamDto.questionIds.map((questionId) => ({
+          examId: createdExam.id,
+          questionId,
+        })),
+      });
+
+      const questionsWithAlternatives = await tx.question.findMany({
+        where: { id: { in: createExamDto.questionIds } },
+        select: {
+          id: true,
+          type: true,
+          alternatives: {
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, isCorrect: true },
+          },
+        },
+      });
+
+      this.validateQuestionAlternativesForVersionCreation(
+        questionsWithAlternatives,
+      );
+
+      const questionById = new Map(
+        questionsWithAlternatives.map((question) => [question.id, question]),
+      );
+
+      const orderData: ExamVersionOrderData = {
+        questions: createExamDto.questionIds.map((questionId, questionIndex) => {
+          const question = questionById.get(questionId);
+          if (!question) {
+            throw new NotFoundException(`Question with ID ${questionId} not found`);
+          }
+
+          return {
+            questionId,
+            position: questionIndex + 1,
+            alternatives: question.alternatives.map((alternative, alternativeIndex) => ({
+              alternativeId: alternative.id,
+              position: alternativeIndex + 1,
+            })),
+          };
+        }),
+      };
+
+      await tx.examVersion.create({
+        data: {
+          name: 'Versao A',
+          examId: createdExam.id,
+          orderData,
+        },
+      });
+
+      return createdExam;
     });
+
     return plainToInstance(ExamEntity, exam);
   }
 
@@ -107,26 +223,13 @@ export class ExamsService {
     updateExamDto: UpdateExamDto,
     authUser: AuthTokenPayload,
   ): Promise<ExamEntity> {
-    const currentExam = await this.findOne(id, authUser);
-
-    if (updateExamDto.disciplineId) {
-      const discipline = await this.prisma.discipline.findUnique({
-        where: { id: updateExamDto.disciplineId },
-        select: { userId: true },
-      });
-      if (!discipline || discipline.userId !== currentExam.userId) {
-        throw new NotFoundException(
-          `Discipline with ID ${updateExamDto.disciplineId} not found`,
-        );
-      }
-    }
+    await this.findOne(id, authUser);
 
     const exam = await this.prisma.exam.update({
       where: { id },
       data: {
         name: updateExamDto.name,
         description: updateExamDto.description,
-        disciplineId: updateExamDto.disciplineId,
       },
     });
     return plainToInstance(ExamEntity, exam);
@@ -169,18 +272,11 @@ export class ExamsService {
       );
     }
 
-    if (question.topic.discipline.id !== exam.disciplineId) {
-      throw new BadRequestException(
-        'Question topic discipline must match exam discipline',
-      );
-    }
-
     try {
       const examQuestion = await this.prisma.examQuestion.create({
         data: {
           examId,
           questionId: addExamQuestionDto.questionId,
-          position: addExamQuestionDto.position,
         },
       });
 

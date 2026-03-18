@@ -37,7 +37,7 @@ export class ExamVersionsService {
       where: { id: examId },
       include: {
         examQuestions: {
-          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          orderBy: [{ createdAt: 'asc' }],
           include: {
             question: {
               include: {
@@ -69,12 +69,6 @@ export class ExamVersionsService {
     for (const examQuestion of exam.examQuestions) {
       const question = examQuestion.question;
 
-      if (question.topic.disciplineId !== exam.disciplineId) {
-        throw new BadRequestException(
-          `Question ${question.id} does not belong to exam discipline`,
-        );
-      }
-
       const totalAlternatives = question.alternatives.length;
       const correctAlternatives = question.alternatives.filter(
         (alternative) => alternative.isCorrect,
@@ -92,9 +86,9 @@ export class ExamVersionsService {
         );
       }
 
-      if (correctAlternatives !== 1) {
+      if (correctAlternatives < 1) {
         throw new BadRequestException(
-          `Question ${question.id} must have exactly 1 correct alternative`,
+          `Question ${question.id} must have at least 1 correct alternative`,
         );
       }
     }
