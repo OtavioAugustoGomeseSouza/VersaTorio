@@ -274,7 +274,7 @@ legend {
 .kanban-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .kanban-column {
@@ -318,6 +318,50 @@ legend {
   align-items: center;
   justify-content: center;
   font-size: 1.15rem;
+}
+
+.icon-btn-small {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+}
+
+.discipline-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.discipline-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.discipline-card:hover {
+  border-color: #9ecfa8;
+}
+
+.discipline-card-active {
+  border-color: #73b487;
+  box-shadow: 0 0 0 3px rgba(115, 180, 135, 0.18);
+  background: #f5fbf6;
+}
+
+.topic-inline-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.spotlight-block {
+  border: 1px solid #b6dcc2;
+  background: #edf8f0;
+  border-radius: 10px;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
 }
 
 .modal-overlay {
@@ -445,6 +489,10 @@ legend {
   }
 
   .draw-row {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-grid {
     grid-template-columns: 1fr;
   }
 }

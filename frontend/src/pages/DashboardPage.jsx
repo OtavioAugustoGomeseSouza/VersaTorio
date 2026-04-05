@@ -80,7 +80,7 @@ export default function DashboardPage({ token, onUnauthorized }) {
     <div className="page-grid">
       <header>
         <h1>Dashboard</h1>
-        <p className="muted">Visao geral das entidades principais do sistema.</p>
+        <p className="muted">Visão geral das entidades principais do sistema.</p>
       </header>
 
       {error ? <p className="feedback error">{error}</p> : null}
@@ -91,11 +91,11 @@ export default function DashboardPage({ token, onUnauthorized }) {
           <p>{metrics.disciplines}</p>
         </article>
         <article className="stat-card">
-          <h2>Materias/Topicos</h2>
+          <h2>Matérias/Tópicos</h2>
           <p>{metrics.topics}</p>
         </article>
         <article className="stat-card">
-          <h2>Questoes</h2>
+          <h2>Questões</h2>
           <p>{metrics.questions}</p>
         </article>
         <article className="stat-card">
@@ -103,7 +103,7 @@ export default function DashboardPage({ token, onUnauthorized }) {
           <p>{metrics.exams}</p>
         </article>
         <article className="stat-card">
-          <h2>Versoes</h2>
+          <h2>Versões</h2>
           <p>{metrics.versions}</p>
         </article>
       </section>

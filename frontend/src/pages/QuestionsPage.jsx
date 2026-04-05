@@ -24,8 +24,11 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [showQuestionModal, setShowQuestionModal] = useState(false);
 
   const [disciplineName, setDisciplineName] = useState('');
+  const [createTopicWithDiscipline, setCreateTopicWithDiscipline] = useState(false);
+  const [disciplineInitialTopicName, setDisciplineInitialTopicName] = useState('');
   const [topicName, setTopicName] = useState('');
   const [topicDisciplineId, setTopicDisciplineId] = useState('');
+  const [selectedDisciplineFilterId, setSelectedDisciplineFilterId] = useState('');
 
   const [questionDisciplineId, setQuestionDisciplineId] = useState('');
   const [questionTopicId, setQuestionTopicId] = useState('');
@@ -66,6 +69,17 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const topicsFromQuestionDiscipline =
     topicsByDiscipline[questionDisciplineId] ?? [];
 
+  const filteredQuestions = useMemo(() => {
+    if (!selectedDisciplineFilterId) {
+      return questions;
+    }
+
+    return questions.filter((question) => {
+      const topic = topicById[question.topicId];
+      return topic?.disciplineId === selectedDisciplineFilterId;
+    });
+  }, [questions, selectedDisciplineFilterId, topicById]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setMessage('');
@@ -104,18 +118,34 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (disciplines.length === 0) {
+      setSelectedDisciplineFilterId('');
+      return;
+    }
+
+    if (
+      selectedDisciplineFilterId &&
+      !disciplines.some((discipline) => discipline.id === selectedDisciplineFilterId)
+    ) {
+      setSelectedDisciplineFilterId('');
+    }
+  }, [disciplines, selectedDisciplineFilterId]);
+
   function openDisciplineModal() {
     setDisciplineName('');
+    setCreateTopicWithDiscipline(false);
+    setDisciplineInitialTopicName('');
     setShowDisciplineModal(true);
   }
 
-  function openTopicModal() {
-    if (disciplines.length === 0) {
+  function openTopicModalForDiscipline(disciplineId) {
+    if (!disciplineId) {
       return;
     }
 
     setTopicName('');
-    setTopicDisciplineId(disciplines[0].id);
+    setTopicDisciplineId(disciplineId);
     setShowTopicModal(true);
   }
 
@@ -124,7 +154,14 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       return;
     }
 
-    const initialDisciplineId = disciplines[0].id;
+    const selectedTopics = topicsByDiscipline[selectedDisciplineFilterId] ?? [];
+    const fallbackDiscipline = disciplines.find(
+      (discipline) => (topicsByDiscipline[discipline.id] ?? []).length > 0,
+    );
+    const initialDisciplineId =
+      selectedTopics.length > 0
+        ? selectedDisciplineFilterId
+        : fallbackDiscipline?.id ?? disciplines[0].id;
     const initialTopicId = (topicsByDiscipline[initialDisciplineId] ?? [])[0]?.id;
 
     setQuestionDisciplineId(initialDisciplineId);
@@ -178,7 +215,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setMessage('');
 
     try {
-      await apiRequest('/disciplines', {
+      const createdDiscipline = await apiRequest('/disciplines', {
         method: 'POST',
         token,
         body: {
@@ -186,8 +223,23 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         },
       });
 
+      if (createTopicWithDiscipline && disciplineInitialTopicName.trim()) {
+        await apiRequest(`/disciplines/${createdDiscipline.id}/topics`, {
+          method: 'POST',
+          token,
+          body: {
+            name: disciplineInitialTopicName.trim(),
+          },
+        });
+      }
+
       closeAllModals();
-      setMessage('Disciplina criada com sucesso');
+      setSelectedDisciplineFilterId(createdDiscipline.id);
+      setMessage(
+        createTopicWithDiscipline && disciplineInitialTopicName.trim()
+          ? 'Disciplina e tópico criados com sucesso'
+          : 'Disciplina criada com sucesso',
+      );
       await loadData();
     } catch (error) {
       if (error.status === 401) {
@@ -328,8 +380,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       <header>
         <h1>Banco de questões</h1>
         <p className="muted">
-          Organização em colunas com criação por popup de disciplinas, tópicos e
-          questões.
+          Clique em uma disciplina para destacar e filtrar as questões pelos
+          tópicos dela.
         </p>
       </header>
 
@@ -349,41 +401,49 @@ export default function QuestionsPage({ token, onUnauthorized }) {
           {disciplines.length === 0 ? <p>Nenhuma disciplina cadastrada.</p> : null}
 
           <div className="kanban-list">
-            {disciplines.map((discipline) => (
-              <article key={discipline.id} className="kanban-item">
-                <h3>{discipline.name}</h3>
-                <p className="muted">
-                  Tópicos: {(topicsByDiscipline[discipline.id] ?? []).length}
-                </p>
-              </article>
-            ))}
-          </div>
-        </article>
+            {disciplines.map((discipline) => {
+              const topicsForDiscipline = topicsByDiscipline[discipline.id] ?? [];
 
-        <article className="kanban-column card">
-          <div className="kanban-column-header">
-            <h2>Tópicos</h2>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={openTopicModal}
-              disabled={disciplines.length === 0}
-            >
-              +
-            </button>
-          </div>
-
-          {allTopics.length === 0 ? <p>Nenhum tópico cadastrado.</p> : null}
-
-          <div className="kanban-list">
-            {allTopics.map((topic) => (
-              <article key={topic.id} className="kanban-item">
-                <h3>{topic.name}</h3>
-                <p className="muted">
-                  Disciplina: {disciplineById[topic.disciplineId]?.name ?? '-'}
-                </p>
-              </article>
-            ))}
+              return (
+                <article
+                  key={discipline.id}
+                  className={
+                    selectedDisciplineFilterId === discipline.id
+                      ? 'kanban-item discipline-card discipline-card-active'
+                      : 'kanban-item discipline-card'
+                  }
+                  onClick={() =>
+                    setSelectedDisciplineFilterId((currentId) =>
+                      currentId === discipline.id ? '' : discipline.id,
+                    )
+                  }
+                >
+                  <div className="discipline-item-header">
+                    <h3>{discipline.name}</h3>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openTopicModalForDiscipline(discipline.id);
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="muted">Tópicos: {topicsForDiscipline.length}</p>
+                  {topicsForDiscipline.length > 0 ? (
+                    <ul className="topic-inline-list">
+                      {topicsForDiscipline.map((topic) => (
+                        <li key={topic.id}>{topic.name}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">Sem tópicos cadastrados.</p>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </article>
 
@@ -400,10 +460,12 @@ export default function QuestionsPage({ token, onUnauthorized }) {
             </button>
           </div>
 
-          {questions.length === 0 ? <p>Nenhuma questão cadastrada.</p> : null}
+          {filteredQuestions.length === 0 ? (
+            <p>Nenhuma questão cadastrada para a disciplina selecionada.</p>
+          ) : null}
 
           <div className="kanban-list">
-            {questions.map((question) => {
+            {filteredQuestions.map((question) => {
               const topic = topicById[question.topicId];
               const discipline = topic
                 ? disciplineById[topic.disciplineId]
@@ -453,6 +515,35 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 required
               />
 
+              <div className="spotlight-block">
+                <label className="checkbox-label" htmlFor="create-topic-with-discipline">
+                  <input
+                    id="create-topic-with-discipline"
+                    type="checkbox"
+                    checked={createTopicWithDiscipline}
+                    onChange={(event) =>
+                      setCreateTopicWithDiscipline(event.target.checked)
+                    }
+                  />
+                  Também criar um tópico agora
+                </label>
+
+                {createTopicWithDiscipline ? (
+                  <label htmlFor="modal-discipline-initial-topic">
+                    Primeiro tópico
+                    <input
+                      id="modal-discipline-initial-topic"
+                      type="text"
+                      value={disciplineInitialTopicName}
+                      onChange={(event) =>
+                        setDisciplineInitialTopicName(event.target.value)
+                      }
+                      placeholder="Ex.: Introdução"
+                    />
+                  </label>
+                ) : null}
+              </div>
+
               <button type="submit" disabled={savingDiscipline}>
                 {savingDiscipline ? 'Salvando...' : 'Criar disciplina'}
               </button>
@@ -473,18 +564,12 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
             <form onSubmit={handleCreateTopic} className="form-grid">
               <label htmlFor="modal-topic-discipline">Disciplina</label>
-              <select
+              <input
                 id="modal-topic-discipline"
-                value={topicDisciplineId}
-                onChange={(event) => setTopicDisciplineId(event.target.value)}
-                required
-              >
-                {disciplines.map((discipline) => (
-                  <option key={discipline.id} value={discipline.id}>
-                    {discipline.name}
-                  </option>
-                ))}
-              </select>
+                type="text"
+                value={disciplineById[topicDisciplineId]?.name ?? ''}
+                disabled
+              />
 
               <label htmlFor="modal-topic-name">Nome do tópico</label>
               <input
