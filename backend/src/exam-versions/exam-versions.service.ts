@@ -97,25 +97,34 @@ export class ExamVersionsService {
   async generate(
     examId: string,
     name: string,
+    shuffleQuestionsOverride: boolean | undefined,
+    shuffleAlternativesOverride: boolean | undefined,
     authUser: AuthTokenPayload,
   ) {
     const exam = await this.getAccessibleExam(examId, authUser);
     this.validateExamQuestionsForGeneration(exam);
 
-    const shuffledQuestions = this.shuffle(
+    const shouldShuffleQuestions =
+      shuffleQuestionsOverride ?? exam.shuffleQuestions;
+    const shouldShuffleAlternatives =
+      shuffleAlternativesOverride ?? exam.shuffleAlternatives;
+
+    const orderedQuestions = this.shuffleQuestions(
       exam.examQuestions.map((examQuestion) => examQuestion.question),
+      shouldShuffleQuestions,
     );
 
     const orderData: ExamVersionOrderData = {
-      questions: shuffledQuestions.map((question, questionIndex) => ({
+      questions: orderedQuestions.map((question, questionIndex) => ({
         questionId: question.id,
         position: questionIndex + 1,
-        alternatives: this.shuffle([...question.alternatives]).map(
-          (alternative, alternativeIndex) => ({
-            alternativeId: alternative.id,
-            position: alternativeIndex + 1,
-          }),
-        ),
+        alternatives: this.shuffleAlternatives(
+          [...question.alternatives],
+          shouldShuffleAlternatives,
+        ).map((alternative, alternativeIndex) => ({
+          alternativeId: alternative.id,
+          position: alternativeIndex + 1,
+        })),
       })),
     };
 
@@ -128,12 +137,34 @@ export class ExamVersionsService {
     });
   }
 
-  private shuffle<T>(array: T[]): T[] {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+  private shuffleQuestions<T>(questions: T[], shouldShuffle: boolean): T[] {
+    if (!shouldShuffle) {
+      return [...questions];
     }
-    return array;
+
+    return this.shuffleArray(questions);
+  }
+
+  private shuffleAlternatives<T>(
+    alternatives: T[],
+    shouldShuffle: boolean,
+  ): T[] {
+    if (!shouldShuffle) {
+      return [...alternatives];
+    }
+
+    return this.shuffleArray(alternatives);
+  }
+
+  private shuffleArray<T>(array: T[]): T[] {
+    const copy = [...array];
+
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy;
   }
 
   findAll(authUser: AuthTokenPayload) {

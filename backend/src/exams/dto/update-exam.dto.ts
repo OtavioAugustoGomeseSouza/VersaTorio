@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpdateExamDto {
   @IsString()
@@ -8,4 +9,19 @@ export class UpdateExamDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  shuffleQuestions?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  shuffleAlternatives?: boolean;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(26)
+  @IsOptional()
+  versionsCountDefault?: number;
 }

@@ -26,6 +26,8 @@ export class ExamVersionsController {
     return this.examVersionsService.generate(
       createExamVersionDto.examId,
       createExamVersionDto.name,
+      createExamVersionDto.shuffleQuestions,
+      createExamVersionDto.shuffleAlternatives,
       authUser,
     );
   }

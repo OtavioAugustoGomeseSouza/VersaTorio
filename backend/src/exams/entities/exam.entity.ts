@@ -7,6 +7,9 @@ export class ExamEntity {
   id: string;
   name: string;
   description?: string;
+  shuffleQuestions: boolean;
+  shuffleAlternatives: boolean;
+  versionsCountDefault: number;
   createdAt: Date;
   updatedAt: Date;
   userId: string;

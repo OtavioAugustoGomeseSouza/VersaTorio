@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateExamVersionDto {
   @IsString()
@@ -8,4 +8,12 @@ export class CreateExamVersionDto {
   @IsUUID()
   @IsNotEmpty()
   examId: string;
+
+  @IsBoolean()
+  @IsOptional()
+  shuffleQuestions?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  shuffleAlternatives?: boolean;
 }

@@ -12,6 +12,7 @@ import { ExamsService } from './exams.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { AddExamQuestionDto } from './dto/add-exam-question.dto';
+import { DrawQuestionsDto } from './dto/draw-questions.dto';
 import {
   type AuthenticatedRequest,
 } from '../auth/interfaces/auth-token-payload.interface';
@@ -27,6 +28,15 @@ export class ExamsController {
   ) {
     const authUser = request.user;
     return this.examsService.create(createExamDto, authUser);
+  }
+
+  @Post('draw-questions')
+  drawQuestions(
+    @Body() drawQuestionsDto: DrawQuestionsDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
+    return this.examsService.drawQuestions(drawQuestionsDto, authUser);
   }
 
   @Get()

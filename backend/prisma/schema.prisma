@@ -65,6 +65,9 @@ model Exam {
   id           String   @id @default(uuid())
   name         String
   description  String?
+  shuffleQuestions    Boolean  @default(true)
+  shuffleAlternatives Boolean  @default(true)
+  versionsCountDefault Int     @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   userId       String

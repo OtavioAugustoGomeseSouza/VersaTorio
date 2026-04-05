@@ -4,18 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateExamDto } from './dto/create-exam.dto';
-import { UpdateExamDto } from './dto/update-exam.dto';
-import { PrismaService } from '../prisma/prisma.service';
-import { ExamEntity } from './entities/exam.entity';
+import { Prisma, QuestionType } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import {
   AuthTokenPayload,
   UserRole,
 } from '../auth/interfaces/auth-token-payload.interface';
+import { PrismaService } from '../prisma/prisma.service';
 import { AddExamQuestionDto } from './dto/add-exam-question.dto';
+import { CreateExamDto } from './dto/create-exam.dto';
+import { DrawQuestionsDto } from './dto/draw-questions.dto';
+import { UpdateExamDto } from './dto/update-exam.dto';
+import { ExamEntity } from './entities/exam.entity';
 import { ExamQuestionEntity } from './entities/exam-question.entity';
-import { Prisma, QuestionType } from '@prisma/client';
 
 type ExamVersionOrderData = {
   questions: Array<{
@@ -28,12 +29,103 @@ type ExamVersionOrderData = {
   }>;
 };
 
+type QuestionForCreation = {
+  id: string;
+  topic: { discipline: { id: string; userId: string } };
+};
+
+type QuestionForOrder = {
+  id: string;
+  type: QuestionType;
+  alternatives: Array<{ id: string; isCorrect: boolean }>;
+};
+
 @Injectable()
 export class ExamsService {
   constructor(private prisma: PrismaService) {}
 
   private isAdmin(authUser: AuthTokenPayload): boolean {
     return authUser.role === UserRole.admin;
+  }
+
+  private buildVersionName(index: number): string {
+    const letterIndex = index % 26;
+    const cycle = Math.floor(index / 26);
+    const letter = String.fromCharCode(65 + letterIndex);
+
+    if (cycle === 0) {
+      return `Versao ${letter}`;
+    }
+
+    return `Versao ${letter}${cycle + 1}`;
+  }
+
+  private shuffleArray<T>(array: T[]): T[] {
+    const copy = [...array];
+
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy;
+  }
+
+  private shuffleQuestions<T>(questions: T[], shouldShuffle: boolean): T[] {
+    if (!shouldShuffle) {
+      return [...questions];
+    }
+
+    return this.shuffleArray(questions);
+  }
+
+  private shuffleAlternatives<T>(
+    alternatives: T[],
+    shouldShuffle: boolean,
+  ): T[] {
+    if (!shouldShuffle) {
+      return [...alternatives];
+    }
+
+    return this.shuffleArray(alternatives);
+  }
+
+  private buildOrderData(
+    questions: QuestionForOrder[],
+    shuffleAlternatives: boolean,
+  ): ExamVersionOrderData {
+    return {
+      questions: questions.map((question, questionIndex) => ({
+        questionId: question.id,
+        position: questionIndex + 1,
+        alternatives: this.shuffleAlternatives(
+          question.alternatives,
+          shuffleAlternatives,
+        ).map((alternative, alternativeIndex) => ({
+          alternativeId: alternative.id,
+          position: alternativeIndex + 1,
+        })),
+      })),
+    };
+  }
+
+  private async ensureDisciplineAccess(
+    disciplineId: string,
+    authUser: AuthTokenPayload,
+  ): Promise<{ id: string; userId: string }> {
+    const discipline = await this.prisma.discipline.findUnique({
+      where: { id: disciplineId },
+      select: { id: true, userId: true },
+    });
+
+    if (
+      !discipline ||
+      (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Discipline with ID ${disciplineId} not found`);
+    }
+
+    return discipline;
   }
 
   private async ensureExamAccess(
@@ -52,11 +144,10 @@ export class ExamsService {
     return exam;
   }
 
-
   private async getQuestionsForExamCreation(
     questionIds: string[],
     authUser: AuthTokenPayload,
-  ): Promise<Array<{ id: string; topic: { discipline: { id: string; userId: string } } }>> {
+  ): Promise<QuestionForCreation[]> {
     const questions = await this.prisma.question.findMany({
       where: { id: { in: questionIds } },
       select: {
@@ -91,11 +182,7 @@ export class ExamsService {
   }
 
   private validateQuestionAlternativesForVersionCreation(
-    questions: Array<{
-      id: string;
-      type: QuestionType;
-      alternatives: Array<{ id: string; isCorrect: boolean }>;
-    }>,
+    questions: QuestionForOrder[],
   ): void {
     for (const question of questions) {
       const totalAlternatives = question.alternatives.length;
@@ -106,6 +193,12 @@ export class ExamsService {
       if (totalAlternatives < 2) {
         throw new BadRequestException(
           `Question ${question.id} must have at least 2 alternatives`,
+        );
+      }
+
+      if (question.type === QuestionType.TRUE_FALSE && totalAlternatives !== 2) {
+        throw new BadRequestException(
+          `Question ${question.id} must have exactly 2 alternatives for TRUE_FALSE`,
         );
       }
 
@@ -125,10 +218,25 @@ export class ExamsService {
       createExamDto.questionIds,
       authUser,
     );
+
     const discipline = questions[0].topic.discipline;
+    const hasMixedDisciplineQuestions = questions.some(
+      (question) => question.topic.discipline.id !== discipline.id,
+    );
+
+    if (hasMixedDisciplineQuestions) {
+      throw new BadRequestException(
+        'All questions must belong to the same discipline',
+      );
+    }
+
     const examOwnerId = this.isAdmin(authUser)
       ? discipline.userId
       : authUser.id;
+
+    const shuffleQuestions = createExamDto.shuffleQuestions ?? true;
+    const shuffleAlternatives = createExamDto.shuffleAlternatives ?? true;
+    const versionsCount = createExamDto.versionsCount ?? 1;
 
     const exam = await this.prisma.$transaction(async (tx) => {
       const createdExam = await tx.exam.create({
@@ -137,6 +245,9 @@ export class ExamsService {
           description: createExamDto.description,
           disciplineId: discipline.id,
           userId: examOwnerId,
+          shuffleQuestions,
+          shuffleAlternatives,
+          versionsCountDefault: versionsCount,
         },
       });
 
@@ -167,36 +278,119 @@ export class ExamsService {
         questionsWithAlternatives.map((question) => [question.id, question]),
       );
 
-      const orderData: ExamVersionOrderData = {
-        questions: createExamDto.questionIds.map((questionId, questionIndex) => {
-          const question = questionById.get(questionId);
-          if (!question) {
-            throw new NotFoundException(`Question with ID ${questionId} not found`);
-          }
+      const baseOrderedQuestions = createExamDto.questionIds.map((questionId) => {
+        const question = questionById.get(questionId);
+        if (!question) {
+          throw new NotFoundException(`Question with ID ${questionId} not found`);
+        }
 
-          return {
-            questionId,
-            position: questionIndex + 1,
-            alternatives: question.alternatives.map((alternative, alternativeIndex) => ({
-              alternativeId: alternative.id,
-              position: alternativeIndex + 1,
-            })),
-          };
-        }),
-      };
-
-      await tx.examVersion.create({
-        data: {
-          name: 'Versao A',
-          examId: createdExam.id,
-          orderData,
-        },
+        return question;
       });
+
+      for (let index = 0; index < versionsCount; index += 1) {
+        const versionQuestions = this.shuffleQuestions(
+          baseOrderedQuestions,
+          shuffleQuestions,
+        );
+
+        await tx.examVersion.create({
+          data: {
+            name: this.buildVersionName(index),
+            examId: createdExam.id,
+            orderData: this.buildOrderData(versionQuestions, shuffleAlternatives),
+          },
+        });
+      }
 
       return createdExam;
     });
 
     return plainToInstance(ExamEntity, exam);
+  }
+
+  async drawQuestions(
+    drawQuestionsDto: DrawQuestionsDto,
+    authUser: AuthTokenPayload,
+  ): Promise<{
+    disciplineId: string;
+    questionIds: string[];
+    topicSelections: Array<{ topicId: string; quantity: number; questionIds: string[] }>;
+  }> {
+    await this.ensureDisciplineAccess(drawQuestionsDto.disciplineId, authUser);
+
+    const groupedRules = new Map<string, number>();
+    for (const rule of drawQuestionsDto.topicRules) {
+      const previous = groupedRules.get(rule.topicId) ?? 0;
+      groupedRules.set(rule.topicId, previous + rule.quantity);
+    }
+
+    const topicIds = [...groupedRules.keys()];
+
+    const topics = await this.prisma.topic.findMany({
+      where: {
+        id: { in: topicIds },
+        disciplineId: drawQuestionsDto.disciplineId,
+      },
+      select: { id: true },
+    });
+
+    if (topics.length !== topicIds.length) {
+      throw new NotFoundException(
+        'One or more topics were not found for this discipline',
+      );
+    }
+
+    const questions = await this.prisma.question.findMany({
+      where: {
+        topicId: { in: topicIds },
+      },
+      select: {
+        id: true,
+        topicId: true,
+      },
+    });
+
+    const questionsByTopic = new Map<string, string[]>();
+    for (const question of questions) {
+      const current = questionsByTopic.get(question.topicId) ?? [];
+      current.push(question.id);
+      questionsByTopic.set(question.topicId, current);
+    }
+
+    const questionIds: string[] = [];
+    const topicSelections: Array<{
+      topicId: string;
+      quantity: number;
+      questionIds: string[];
+    }> = [];
+
+    for (const [topicId, quantity] of groupedRules.entries()) {
+      const availableQuestionIds = questionsByTopic.get(topicId) ?? [];
+
+      if (quantity > availableQuestionIds.length) {
+        throw new BadRequestException(
+          `Topic ${topicId} has only ${availableQuestionIds.length} available questions`,
+        );
+      }
+
+      const drawnQuestionIds = this.shuffleQuestions(availableQuestionIds, true).slice(
+        0,
+        quantity,
+      );
+
+      questionIds.push(...drawnQuestionIds);
+      topicSelections.push({
+        topicId,
+        quantity,
+        questionIds: drawnQuestionIds,
+      });
+    }
+
+    return {
+      disciplineId: drawQuestionsDto.disciplineId,
+      questionIds,
+      topicSelections,
+    };
   }
 
   async findAll(authUser: AuthTokenPayload): Promise<ExamEntity[]> {
@@ -230,6 +424,9 @@ export class ExamsService {
       data: {
         name: updateExamDto.name,
         description: updateExamDto.description,
+        shuffleQuestions: updateExamDto.shuffleQuestions,
+        shuffleAlternatives: updateExamDto.shuffleAlternatives,
+        versionsCountDefault: updateExamDto.versionsCountDefault,
       },
     });
     return plainToInstance(ExamEntity, exam);
@@ -269,6 +466,12 @@ export class ExamsService {
     ) {
       throw new NotFoundException(
         `Question with ID ${addExamQuestionDto.questionId} not found`,
+      );
+    }
+
+    if (question.topic.discipline.id !== exam.disciplineId) {
+      throw new BadRequestException(
+        'Question discipline must match exam discipline',
       );
     }
 
