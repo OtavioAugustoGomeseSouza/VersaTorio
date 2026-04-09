@@ -1,21 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../lib/api';
 
-function buildVersionName(base, index) {
-  const letter = String.fromCharCode(65 + index);
-  return `${base} ${letter}`;
-}
-
 export default function VersionsPage({ token, onUnauthorized }) {
   const [exams, setExams] = useState([]);
   const [versions, setVersions] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState('');
-  const [baseName, setBaseName] = useState('Versão');
-  const [quantity, setQuantity] = useState(1);
   const [selectedVersionId, setSelectedVersionId] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   const examById = useMemo(() => {
@@ -104,41 +96,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
     }
   }, [filteredVersions, selectedVersionId]);
 
-  async function handleGenerateVersions(event) {
-    event.preventDefault();
-
-    if (!selectedExamId || quantity < 1) {
-      return;
-    }
-
-    setSaving(true);
-    setMessage('');
-
-    try {
-      for (let index = 0; index < quantity; index += 1) {
-        await apiRequest('/exam-versions/generate', {
-          method: 'POST',
-          token,
-          body: {
-            examId: selectedExamId,
-            name: buildVersionName(baseName.trim() || 'Versão', index),
-          },
-        });
-      }
-
-      setMessage('Versões geradas com sucesso');
-      await loadData();
-    } catch (error) {
-      if (error.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      setMessage(error.message ?? 'Erro ao gerar versões');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDeleteVersion(id) {
     const confirmed = window.confirm('Deseja remover esta versão?');
     if (!confirmed) {
@@ -200,9 +157,9 @@ export default function VersionsPage({ token, onUnauthorized }) {
       </header>
 
       <section className="card">
-        <h2>Gerar versões</h2>
+        <h2>Filtros</h2>
 
-        <form onSubmit={handleGenerateVersions} className="form-grid">
+        <div className="form-grid">
           <label htmlFor="version-exam">Prova</label>
           <div className="input-with-action">
             <select
@@ -235,33 +192,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
               x
             </button>
           </div>
-
-          <label htmlFor="version-base-name">Prefixo do nome</label>
-          <input
-            id="version-base-name"
-            type="text"
-            value={baseName}
-            onChange={(event) => setBaseName(event.target.value)}
-            placeholder="Versão"
-          />
-
-          <label htmlFor="version-quantity">Quantidade</label>
-          <input
-            id="version-quantity"
-            type="number"
-            min={1}
-            max={26}
-            value={quantity}
-            onChange={(event) => setQuantity(Number(event.target.value) || 1)}
-          />
-
-          <button
-            type="submit"
-            disabled={saving || exams.length === 0 || !selectedExamId}
-          >
-            {saving ? 'Gerando...' : 'Gerar'}
-          </button>
-        </form>
+        </div>
       </section>
 
       {message ? <p className="feedback">{message}</p> : null}
