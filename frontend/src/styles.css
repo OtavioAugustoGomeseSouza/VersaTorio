@@ -227,6 +227,19 @@ legend {
   border-bottom: 1px solid var(--border);
 }
 
+.table-row-clickable {
+  cursor: pointer;
+}
+
+.table-row-clickable:hover {
+  background: #f4f8f2;
+}
+
+.table-row-clickable:focus-visible {
+  outline: 2px solid #73b487;
+  outline-offset: -2px;
+}
+
 .danger-btn {
   background: var(--danger);
 }
@@ -259,6 +272,12 @@ legend {
   align-items: center;
 }
 
+.input-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .checkbox-label input {
   width: auto;
 }
@@ -269,6 +288,69 @@ legend {
   max-height: 260px;
   overflow: auto;
   padding-right: 0.4rem;
+}
+
+.checklist-nested {
+  max-height: none;
+  overflow: visible;
+}
+
+.question-tree {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.question-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.question-topic-list {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.55rem;
+}
+
+.question-topic {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fdfdfb;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.collapse-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 0;
+  background: #eef5ee;
+  color: var(--ink);
+  border: 0;
+  text-align: left;
+  font-weight: 600;
+}
+
+.collapse-toggle:hover {
+  background: #e4efe4;
+}
+
+.collapse-toggle-topic {
+  background: #f5f8f2;
+  font-weight: 500;
+}
+
+.collapse-toggle-topic:hover {
+  background: #edf3e8;
+}
+
+.collapse-arrow {
+  width: 1rem;
+  text-align: center;
+  font-weight: 700;
 }
 
 .kanban-grid {

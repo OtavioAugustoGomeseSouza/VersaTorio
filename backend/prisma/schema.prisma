@@ -81,7 +81,7 @@ model Exam {
 
 model Question {
   id            String         @id @default(uuid())
-  text          String
+  text          String         @db.Text
   type          QuestionType
   topicId       String
   alternatives  Alternative[]

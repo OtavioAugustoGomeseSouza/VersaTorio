@@ -26,7 +26,17 @@ export default function VersionsPage({ token, onUnauthorized }) {
     return result;
   }, [exams]);
 
-  const selectedVersion = versions.find((version) => version.id === selectedVersionId);
+  const filteredVersions = useMemo(() => {
+    if (!selectedExamId) {
+      return versions;
+    }
+
+    return versions.filter((version) => version.examId === selectedExamId);
+  }, [versions, selectedExamId]);
+
+  const selectedVersion = filteredVersions.find(
+    (version) => version.id === selectedVersionId,
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -63,10 +73,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
           return currentSelectedExamId;
         }
 
-        if (examsData.length > 0) {
-          return examsData[0].id;
-        }
-
         return '';
       });
 
@@ -93,10 +99,10 @@ export default function VersionsPage({ token, onUnauthorized }) {
       return;
     }
 
-    if (!versions.some((version) => version.id === selectedVersionId)) {
+    if (!filteredVersions.some((version) => version.id === selectedVersionId)) {
       setSelectedVersionId('');
     }
-  }, [versions, selectedVersionId]);
+  }, [filteredVersions, selectedVersionId]);
 
   async function handleGenerateVersions(event) {
     event.preventDefault();
@@ -157,6 +163,36 @@ export default function VersionsPage({ token, onUnauthorized }) {
     }
   }
 
+  function handleVersionRowClick(event, versionId) {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    if (target.closest('button, a, input, select, textarea')) {
+      return;
+    }
+
+    setSelectedVersionId(versionId);
+  }
+
+  function handleVersionRowKeyDown(event, versionId) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest('button, a, input, select, textarea')
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    setSelectedVersionId(versionId);
+  }
+
   return (
     <div className="page-grid">
       <header>
@@ -168,22 +204,37 @@ export default function VersionsPage({ token, onUnauthorized }) {
 
         <form onSubmit={handleGenerateVersions} className="form-grid">
           <label htmlFor="version-exam">Prova</label>
-          <select
-            id="version-exam"
-            value={selectedExamId}
-            onChange={(event) => setSelectedExamId(event.target.value)}
-            disabled={exams.length === 0}
-          >
-            {exams.length === 0 ? (
-              <option value="">Cadastre uma prova antes</option>
-            ) : (
-              exams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.name}
-                </option>
-              ))
-            )}
-          </select>
+          <div className="input-with-action">
+            <select
+              id="version-exam"
+              value={selectedExamId}
+              onChange={(event) => setSelectedExamId(event.target.value)}
+              disabled={exams.length === 0}
+            >
+              {exams.length === 0 ? (
+                <option value="">Cadastre uma prova antes</option>
+              ) : (
+                <>
+                  <option value="">Todas as provas</option>
+                  {exams.map((exam) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.name}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+            <button
+              type="button"
+              className="icon-btn icon-btn-small ghost-btn"
+              onClick={() => setSelectedExamId('')}
+              disabled={!selectedExamId}
+              title="Limpar seleção de prova"
+              aria-label="Limpar seleção de prova"
+            >
+              x
+            </button>
+          </div>
 
           <label htmlFor="version-base-name">Prefixo do nome</label>
           <input
@@ -204,7 +255,10 @@ export default function VersionsPage({ token, onUnauthorized }) {
             onChange={(event) => setQuantity(Number(event.target.value) || 1)}
           />
 
-          <button type="submit" disabled={saving || exams.length === 0}>
+          <button
+            type="submit"
+            disabled={saving || exams.length === 0 || !selectedExamId}
+          >
             {saving ? 'Gerando...' : 'Gerar'}
           </button>
         </form>
@@ -216,9 +270,15 @@ export default function VersionsPage({ token, onUnauthorized }) {
         <h2>Versões geradas</h2>
         {loading ? <p>Carregando...</p> : null}
 
-        {!loading && versions.length === 0 ? <p>Nenhuma versão gerada.</p> : null}
+        {!loading && filteredVersions.length === 0 ? (
+          <p>
+            {selectedExamId
+              ? 'Nenhuma versão gerada para a prova selecionada.'
+              : 'Nenhuma versão gerada.'}
+          </p>
+        ) : null}
 
-        {!loading && versions.length > 0 ? (
+        {!loading && filteredVersions.length > 0 ? (
           <table className="table">
             <thead>
               <tr>
@@ -229,17 +289,17 @@ export default function VersionsPage({ token, onUnauthorized }) {
               </tr>
             </thead>
             <tbody>
-              {versions.map((version) => (
-                <tr key={version.id}>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setSelectedVersionId(version.id)}
-                    >
-                      {version.name}
-                    </button>
-                  </td>
+              {filteredVersions.map((version) => (
+                <tr
+                  key={version.id}
+                  className="table-row-clickable"
+                  tabIndex={0}
+                  onClick={(event) => handleVersionRowClick(event, version.id)}
+                  onKeyDown={(event) =>
+                    handleVersionRowKeyDown(event, version.id)
+                  }
+                >
+                  <td>{version.name}</td>
                   <td>{examById[version.examId]?.name ?? '-'}</td>
                   <td>{new Date(version.createdAt).toLocaleString()}</td>
                   <td>

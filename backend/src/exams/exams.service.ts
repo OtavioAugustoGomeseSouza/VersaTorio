@@ -131,10 +131,10 @@ export class ExamsService {
   private async ensureExamAccess(
     examId: string,
     authUser: AuthTokenPayload,
-  ): Promise<{ id: string; userId: string; disciplineId: string }> {
+  ): Promise<{ id: string; userId: string }> {
     const exam = await this.prisma.exam.findUnique({
       where: { id: examId },
-      select: { id: true, userId: true, disciplineId: true },
+      select: { id: true, userId: true },
     });
 
     if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
@@ -220,15 +220,6 @@ export class ExamsService {
     );
 
     const discipline = questions[0].topic.discipline;
-    const hasMixedDisciplineQuestions = questions.some(
-      (question) => question.topic.discipline.id !== discipline.id,
-    );
-
-    if (hasMixedDisciplineQuestions) {
-      throw new BadRequestException(
-        'All questions must belong to the same discipline',
-      );
-    }
 
     const examOwnerId = this.isAdmin(authUser)
       ? discipline.userId
@@ -466,12 +457,6 @@ export class ExamsService {
     ) {
       throw new NotFoundException(
         `Question with ID ${addExamQuestionDto.questionId} not found`,
-      );
-    }
-
-    if (question.topic.discipline.id !== exam.disciplineId) {
-      throw new BadRequestException(
-        'Question discipline must match exam discipline',
       );
     }
 

@@ -40,6 +40,8 @@ export default function ExamsPage({ token, onUnauthorized }) {
   const [saving, setSaving] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [message, setMessage] = useState('');
+  const [collapsedDisciplines, setCollapsedDisciplines] = useState({});
+  const [collapsedTopics, setCollapsedTopics] = useState({});
 
   const topicById = useMemo(() => {
     const result = {};
@@ -60,11 +62,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
   }, [disciplines]);
 
   const topicsFromSelectedDiscipline =
-    topicsByDiscipline[selectedDisciplineId] ?? [];
+    selectedDisciplineId ? topicsByDiscipline[selectedDisciplineId] ?? [] : [];
 
   const filteredQuestions = useMemo(() => {
     if (!selectedDisciplineId) {
-      return [];
+      return questions;
     }
 
     return questions.filter((question) => {
@@ -85,11 +87,47 @@ export default function ExamsPage({ token, onUnauthorized }) {
 
   const selectedQuestions = useMemo(
     () =>
-      filteredQuestions.filter((question) =>
+      questions.filter((question) =>
         selectedQuestionIds.includes(question.id),
       ),
-    [filteredQuestions, selectedQuestionIds],
+    [questions, selectedQuestionIds],
   );
+
+  const groupedQuestions = useMemo(() => {
+    const questionsByTopicId = new Map();
+
+    filteredQuestions.forEach((question) => {
+      const current = questionsByTopicId.get(question.topicId) ?? [];
+      current.push(question);
+      questionsByTopicId.set(question.topicId, current);
+    });
+
+    const visibleDisciplines = selectedDisciplineId
+      ? disciplines.filter((discipline) => discipline.id === selectedDisciplineId)
+      : disciplines;
+
+    return visibleDisciplines
+      .map((discipline) => {
+        const topicGroups = (topicsByDiscipline[discipline.id] ?? [])
+          .map((topic) => ({
+            topic,
+            questions: questionsByTopicId.get(topic.id) ?? [],
+          }))
+          .filter((group) => group.questions.length > 0);
+
+        const questionsCount = topicGroups.reduce(
+          (total, group) => total + group.questions.length,
+          0,
+        );
+
+        return {
+          discipline,
+          topics: topicGroups,
+          questionsCount,
+        };
+      })
+      .filter((group) => group.topics.length > 0);
+  }, [disciplines, filteredQuestions, selectedDisciplineId, topicsByDiscipline]);
 
   const questionById = useMemo(() => {
     const result = {};
@@ -145,25 +183,20 @@ export default function ExamsPage({ token, onUnauthorized }) {
       return;
     }
 
-    if (!disciplines.some((discipline) => discipline.id === selectedDisciplineId)) {
-      setSelectedDisciplineId(disciplines[0].id);
+    if (
+      selectedDisciplineId &&
+      !disciplines.some((discipline) => discipline.id === selectedDisciplineId)
+    ) {
+      setSelectedDisciplineId('');
     }
   }, [disciplines, selectedDisciplineId]);
 
   useEffect(() => {
-    if (!selectedDisciplineId) {
-      setSelectedQuestionIds([]);
-      setDrawRules([]);
-      setDrawResultByTopic([]);
-      setHasDrawRun(false);
-      return;
-    }
-
-    const validIds = new Set(filteredQuestions.map((question) => question.id));
+    const validIds = new Set(questions.map((question) => question.id));
     setSelectedQuestionIds((currentIds) =>
       currentIds.filter((questionId) => validIds.has(questionId)),
     );
-  }, [filteredQuestions, selectedDisciplineId]);
+  }, [questions]);
 
   useEffect(() => {
     if (questionSelectionMode !== QUESTION_SELECTION_MODE.DRAW) {
@@ -201,8 +234,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
   }
 
   function handleSelectDiscipline(nextDisciplineId) {
+    if (!nextDisciplineId && questionSelectionMode === QUESTION_SELECTION_MODE.DRAW) {
+      setQuestionSelectionMode(QUESTION_SELECTION_MODE.MANUAL);
+    }
+
     setSelectedDisciplineId(nextDisciplineId);
-    setSelectedQuestionIds([]);
     setDrawRules([]);
     setDrawResultByTopic([]);
     setHasDrawRun(false);
@@ -266,6 +302,9 @@ export default function ExamsPage({ token, onUnauthorized }) {
 
   async function handleDrawQuestions() {
     if (!selectedDisciplineId) {
+      setMessage(
+        'Para sortear por tópico, selecione uma disciplina específica.',
+      );
       return;
     }
 
@@ -367,6 +406,54 @@ export default function ExamsPage({ token, onUnauthorized }) {
     }
   }
 
+  function handleOpenExamVersions(examId) {
+    navigate(`/versions?examId=${examId}`);
+  }
+
+  function toggleDisciplineCollapse(disciplineId) {
+    setCollapsedDisciplines((current) => ({
+      ...current,
+      [disciplineId]: !current[disciplineId],
+    }));
+  }
+
+  function toggleTopicCollapse(topicKey) {
+    setCollapsedTopics((current) => ({
+      ...current,
+      [topicKey]: !current[topicKey],
+    }));
+  }
+
+  function handleExamRowClick(event, examId) {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    if (target.closest('button, a, input, select, textarea')) {
+      return;
+    }
+
+    handleOpenExamVersions(examId);
+  }
+
+  function handleExamRowKeyDown(event, examId) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest('button, a, input, select, textarea')
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    handleOpenExamVersions(examId);
+  }
+
   return (
     <div className="page-grid">
       <header>
@@ -397,7 +484,7 @@ export default function ExamsPage({ token, onUnauthorized }) {
             onChange={(event) => setExamDescription(event.target.value)}
           />
 
-          <label htmlFor="exam-discipline">Disciplina da prova</label>
+          <label htmlFor="exam-discipline">Disciplina (opcional)</label>
           <select
             id="exam-discipline"
             value={selectedDisciplineId}
@@ -407,11 +494,14 @@ export default function ExamsPage({ token, onUnauthorized }) {
             {disciplines.length === 0 ? (
               <option value="">Cadastre uma disciplina</option>
             ) : (
-              disciplines.map((discipline) => (
-                <option key={discipline.id} value={discipline.id}>
-                  {discipline.name}
-                </option>
-              ))
+              <>
+                <option value="">Todas as disciplinas</option>
+                {disciplines.map((discipline) => (
+                  <option key={discipline.id} value={discipline.id}>
+                    {discipline.name}
+                  </option>
+                ))}
+              </>
             )}
           </select>
 
@@ -451,7 +541,9 @@ export default function ExamsPage({ token, onUnauthorized }) {
             <fieldset>
               <legend>Sorteio por tópico</legend>
 
-              {topicsFromSelectedDiscipline.length === 0 ? (
+              {!selectedDisciplineId ? (
+                <p>Selecione uma disciplina específica para usar o sorteio.</p>
+              ) : topicsFromSelectedDiscipline.length === 0 ? (
                 <p>Não há tópicos para essa disciplina.</p>
               ) : (
                 <div className="list-grid">
@@ -515,14 +607,21 @@ export default function ExamsPage({ token, onUnauthorized }) {
                   type="button"
                   className="ghost-btn"
                   onClick={addDrawRule}
-                  disabled={topicsFromSelectedDiscipline.length === 0}
+                  disabled={
+                    !selectedDisciplineId ||
+                    topicsFromSelectedDiscipline.length === 0
+                  }
                 >
                   + Adicionar tópico
                 </button>
                 <button
                   type="button"
                   onClick={handleDrawQuestions}
-                  disabled={drawing || topicsFromSelectedDiscipline.length === 0}
+                  disabled={
+                    drawing ||
+                    !selectedDisciplineId ||
+                    topicsFromSelectedDiscipline.length === 0
+                  }
                 >
                   {drawing ? 'Sorteando...' : 'Sortear questões'}
                 </button>
@@ -531,7 +630,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
                     type="button"
                     className="ghost-btn"
                     onClick={handleDrawQuestions}
-                    disabled={drawing || topicsFromSelectedDiscipline.length === 0}
+                    disabled={
+                      drawing ||
+                      !selectedDisciplineId ||
+                      topicsFromSelectedDiscipline.length === 0
+                    }
                   >
                     Sortear novamente
                   </button>
@@ -543,21 +646,77 @@ export default function ExamsPage({ token, onUnauthorized }) {
           {questionSelectionMode === QUESTION_SELECTION_MODE.MANUAL ? (
             <fieldset>
               <legend>Selecionar questões</legend>
-              {filteredQuestions.length === 0 ? (
-                <p>Não há questões para esta disciplina.</p>
+              {groupedQuestions.length === 0 ? (
+                <p>Não há questões para a seleção atual.</p>
               ) : (
-                <div className="checklist">
-                  {filteredQuestions.map((question) => {
-                    const topic = topicById[question.topicId];
+                <div className="question-tree">
+                  {groupedQuestions.map((disciplineGroup) => {
+                    const disciplineId = disciplineGroup.discipline.id;
+                    const isDisciplineCollapsed =
+                      collapsedDisciplines[disciplineId] ?? false;
+
                     return (
-                      <label key={question.id} className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedQuestionIds.includes(question.id)}
-                          onChange={() => toggleQuestion(question.id)}
-                        />
-                        {question.text} ({topic?.name ?? 'Tópico desconhecido'})
-                      </label>
+                      <div key={disciplineId} className="question-group">
+                        <button
+                          type="button"
+                          className="collapse-toggle"
+                          onClick={() => toggleDisciplineCollapse(disciplineId)}
+                        >
+                          <span className="collapse-arrow">
+                            {isDisciplineCollapsed ? '>' : 'v'}
+                          </span>
+                          {disciplineGroup.discipline.name} (
+                          {disciplineGroup.questionsCount})
+                        </button>
+
+                        {!isDisciplineCollapsed ? (
+                          <div className="question-topic-list">
+                            {disciplineGroup.topics.map((topicGroup) => {
+                              const topicKey = `${disciplineId}:${topicGroup.topic.id}`;
+                              const isTopicCollapsed =
+                                collapsedTopics[topicKey] ?? false;
+
+                              return (
+                                <div key={topicGroup.topic.id} className="question-topic">
+                                  <button
+                                    type="button"
+                                    className="collapse-toggle collapse-toggle-topic"
+                                    onClick={() => toggleTopicCollapse(topicKey)}
+                                  >
+                                    <span className="collapse-arrow">
+                                      {isTopicCollapsed ? '>' : 'v'}
+                                    </span>
+                                    {topicGroup.topic.name} (
+                                    {topicGroup.questions.length})
+                                  </button>
+
+                                  {!isTopicCollapsed ? (
+                                    <div className="checklist checklist-nested">
+                                      {topicGroup.questions.map((question) => (
+                                        <label
+                                          key={question.id}
+                                          className="checkbox-label"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedQuestionIds.includes(
+                                              question.id,
+                                            )}
+                                            onChange={() =>
+                                              toggleQuestion(question.id)
+                                            }
+                                          />
+                                          {question.text}
+                                        </label>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -658,7 +817,13 @@ export default function ExamsPage({ token, onUnauthorized }) {
             </thead>
             <tbody>
               {exams.map((exam) => (
-                <tr key={exam.id}>
+                <tr
+                  key={exam.id}
+                  className="table-row-clickable"
+                  tabIndex={0}
+                  onClick={(event) => handleExamRowClick(event, exam.id)}
+                  onKeyDown={(event) => handleExamRowKeyDown(event, exam.id)}
+                >
                   <td>{exam.name}</td>
                   <td>{disciplineById[exam.disciplineId]?.name ?? '-'}</td>
                   <td>
