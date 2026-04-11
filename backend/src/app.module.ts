@@ -13,6 +13,7 @@ import { DisciplinesModule } from './disciplines/disciplines.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
 import { ExamVersionsModule } from './exam-versions/exam-versions.module';
 import { TopicsModule } from './topics/topics.module';
+import { UploadedFilesModule } from './uploaded-files/uploaded-files.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TopicsModule } from './topics/topics.module';
     DisciplinesModule,
     TopicsModule,
     ExamVersionsModule,
+    UploadedFilesModule,
   ],
   controllers: [AppController],
   providers: [

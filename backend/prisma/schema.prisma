@@ -30,6 +30,7 @@ model User {
   role        Role         @default(USER)
   disciplines Discipline[]
   exams       Exam[]
+  uploadedFiles UploadedFile[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
@@ -125,4 +126,18 @@ model Alternative {
   updatedAt  DateTime        @updatedAt
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model UploadedFile {
+  id           String   @id @default(uuid())
+  userId       String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String   @unique
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

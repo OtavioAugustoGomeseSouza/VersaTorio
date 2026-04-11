@@ -458,10 +458,6 @@ export default function ExamsPage({ token, onUnauthorized }) {
     <div className="page-grid">
       <header>
         <h1>Provas</h1>
-        <p className="muted">
-          Crie provas, sorteie questões por tópico e defina a geração de
-          versões.
-        </p>
       </header>
 
       <section className="card">
