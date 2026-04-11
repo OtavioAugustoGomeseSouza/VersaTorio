@@ -40,7 +40,11 @@ export class ExamVersionsService {
           orderBy: [{ createdAt: 'asc' }],
           include: {
             question: {
-              include: {
+              select: {
+                id: true,
+                type: true,
+                answerText: true,
+                answerSpaceSize: true,
                 alternatives: true,
                 topic: {
                   select: { disciplineId: true },
@@ -74,15 +78,25 @@ export class ExamVersionsService {
         (alternative) => alternative.isCorrect,
       ).length;
 
+      if (question.type === QuestionType.DISSERTATIVE) {
+        if (!question.answerText || !question.answerSpaceSize) {
+          throw new BadRequestException(
+            `Question ${question.id} must include answerText and answerSpaceSize for DISSERTATIVE`,
+          );
+        }
+
+        if (totalAlternatives > 0) {
+          throw new BadRequestException(
+            `Question ${question.id} cannot have alternatives for DISSERTATIVE`,
+          );
+        }
+
+        continue;
+      }
+
       if (totalAlternatives < 2) {
         throw new BadRequestException(
           `Question ${question.id} must have at least 2 alternatives`,
-        );
-      }
-
-      if (question.type === QuestionType.TRUE_FALSE && totalAlternatives !== 2) {
-        throw new BadRequestException(
-          `Question ${question.id} must have exactly 2 alternatives for TRUE_FALSE`,
         );
       }
 

@@ -8,7 +8,7 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { QuestionEntity } from './entities/question.entity';
 import { plainToInstance } from 'class-transformer';
-import { Prisma } from '@prisma/client';
+import { Prisma, QuestionType } from '@prisma/client';
 import {
   AuthTokenPayload,
   UserRole,
@@ -110,11 +110,104 @@ export class QuestionsService {
     }));
   }
 
+  private validateQuestionPayloadForCreate(
+    createQuestionDto: CreateQuestionDto,
+  ): void {
+    const answerText = createQuestionDto.answerText?.trim() ?? '';
+    const answerSpaceSize = createQuestionDto.answerSpaceSize;
+
+    if (createQuestionDto.type === QuestionType.DISSERTATIVE) {
+      if (answerText.length === 0) {
+        throw new BadRequestException(
+          'DISSERTATIVE questions must include answerText',
+        );
+      }
+
+      if (!answerSpaceSize) {
+        throw new BadRequestException(
+          'DISSERTATIVE questions must include answerSpaceSize',
+        );
+      }
+    }
+
+    if (createQuestionDto.type === QuestionType.MULTIPLE_CHOICE) {
+      if (answerText.length > 0 || answerSpaceSize) {
+        throw new BadRequestException(
+          'MULTIPLE_CHOICE questions cannot include answerText or answerSpaceSize',
+        );
+      }
+    }
+  }
+
+  private async validateQuestionPayloadForUpdate(
+    id: string,
+    updateQuestionDto: UpdateQuestionDto,
+  ): Promise<void> {
+    if (
+      updateQuestionDto.type === undefined &&
+      updateQuestionDto.answerText === undefined &&
+      updateQuestionDto.answerSpaceSize === undefined
+    ) {
+      return;
+    }
+
+    const currentQuestion = await this.prisma.question.findUnique({
+      where: { id },
+      select: {
+        type: true,
+        answerText: true,
+        answerSpaceSize: true,
+      },
+    });
+
+    if (!currentQuestion) {
+      throw new NotFoundException(`Question with ID ${id} not found`);
+    }
+
+    const nextType = updateQuestionDto.type ?? currentQuestion.type;
+    const nextAnswerText =
+      updateQuestionDto.answerText !== undefined
+        ? updateQuestionDto.answerText.trim()
+        : (currentQuestion.answerText ?? '');
+    const nextAnswerSpaceSize =
+      updateQuestionDto.answerSpaceSize ?? currentQuestion.answerSpaceSize;
+
+    if (nextType === QuestionType.DISSERTATIVE) {
+      if (nextAnswerText.length === 0) {
+        throw new BadRequestException(
+          'DISSERTATIVE questions must include answerText',
+        );
+      }
+
+      if (!nextAnswerSpaceSize) {
+        throw new BadRequestException(
+          'DISSERTATIVE questions must include answerSpaceSize',
+        );
+      }
+    }
+
+    if (nextType === QuestionType.MULTIPLE_CHOICE) {
+      const isSwitchingToMultipleChoice =
+        updateQuestionDto.type === QuestionType.MULTIPLE_CHOICE;
+
+      if (isSwitchingToMultipleChoice) {
+        return;
+      }
+
+      if (nextAnswerText.length > 0 || nextAnswerSpaceSize) {
+        throw new BadRequestException(
+          'MULTIPLE_CHOICE questions cannot include answerText or answerSpaceSize',
+        );
+      }
+    }
+  }
+
   async create(
     createQuestionDto: CreateQuestionDto,
     authUser: AuthTokenPayload,
   ): Promise<QuestionEntity> {
     await this.ensureTopicAccess(createQuestionDto.topicId, authUser);
+    this.validateQuestionPayloadForCreate(createQuestionDto);
     const questionImageFileIds = this.normalizeQuestionImageFileIds(
       createQuestionDto.questionImageFileIds,
     );
@@ -123,6 +216,14 @@ export class QuestionsService {
     const questionData = {
       text: createQuestionDto.text,
       type: createQuestionDto.type,
+      answerText:
+        createQuestionDto.type === QuestionType.DISSERTATIVE
+          ? createQuestionDto.answerText?.trim() ?? null
+          : null,
+      answerSpaceSize:
+        createQuestionDto.type === QuestionType.DISSERTATIVE
+          ? createQuestionDto.answerSpaceSize ?? null
+          : null,
       topicId: createQuestionDto.topicId,
     };
 
@@ -211,6 +312,7 @@ export class QuestionsService {
     authUser: AuthTokenPayload,
   ): Promise<QuestionEntity> {
     await this.findOne(id, authUser);
+    await this.validateQuestionPayloadForUpdate(id, updateQuestionDto);
 
     if (updateQuestionDto.topicId) {
       await this.ensureTopicAccess(updateQuestionDto.topicId, authUser);
@@ -230,6 +332,20 @@ export class QuestionsService {
         : {}),
       ...(updateQuestionDto.type !== undefined
         ? { type: updateQuestionDto.type }
+        : {}),
+      ...(updateQuestionDto.type === QuestionType.MULTIPLE_CHOICE
+        ? { answerText: null, answerSpaceSize: null }
+        : {}),
+      ...(updateQuestionDto.answerText !== undefined
+        ? {
+            answerText:
+              updateQuestionDto.answerText.trim().length > 0
+                ? updateQuestionDto.answerText.trim()
+                : null,
+          }
+        : {}),
+      ...(updateQuestionDto.answerSpaceSize !== undefined
+        ? { answerSpaceSize: updateQuestionDto.answerSpaceSize }
         : {}),
       ...(updateQuestionDto.topicId !== undefined
         ? { topicId: updateQuestionDto.topicId }

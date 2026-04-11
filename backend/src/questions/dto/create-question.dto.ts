@@ -7,7 +7,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { QuestionType } from '../entities/question.entity';
+import { AnswerSpaceSize, QuestionType } from '../entities/question.entity';
 
 export class CreateQuestionDto {
   @IsString()
@@ -16,6 +16,14 @@ export class CreateQuestionDto {
 
   @IsEnum(QuestionType)
   type: QuestionType;
+
+  @IsOptional()
+  @IsString()
+  answerText?: string;
+
+  @IsOptional()
+  @IsEnum(AnswerSpaceSize)
+  answerSpaceSize?: AnswerSpaceSize;
 
   @IsUUID()
   @IsNotEmpty()

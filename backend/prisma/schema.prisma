@@ -4,8 +4,14 @@ enum Role {
 }
 
 enum QuestionType {
-  TRUE_FALSE
   MULTIPLE_CHOICE
+  DISSERTATIVE
+}
+
+enum AnswerSpaceSize {
+  SMALL
+  MEDIUM
+  LARGE
 }
 
 enum AlternativeType {
@@ -84,6 +90,8 @@ model Question {
   id            String         @id @default(uuid())
   text          String         @db.Text
   type          QuestionType
+  answerText    String?        @db.Text
+  answerSpaceSize AnswerSpaceSize?
   topicId       String
   alternatives  Alternative[]
   examQuestions ExamQuestion[]

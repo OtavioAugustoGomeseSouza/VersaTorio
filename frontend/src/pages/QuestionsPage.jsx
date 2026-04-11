@@ -5,6 +5,34 @@ function optionLetter(index) {
   return String.fromCharCode(65 + index);
 }
 
+function formatQuestionType(type) {
+  if (type === 'DISSERTATIVE') {
+    return 'Dissertativa';
+  }
+
+  if (type === 'MULTIPLE_CHOICE') {
+    return 'Múltipla escolha';
+  }
+
+  return type;
+}
+
+function formatAnswerSpaceSize(size) {
+  if (size === 'SMALL') {
+    return 'Pequeno';
+  }
+
+  if (size === 'MEDIUM') {
+    return 'Médio';
+  }
+
+  if (size === 'LARGE') {
+    return 'Grande';
+  }
+
+  return '-';
+}
+
 function createAlternativeDraft() {
   return {
     id: `alt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -91,6 +119,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [questionTopicId, setQuestionTopicId] = useState('');
   const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
   const [questionText, setQuestionText] = useState('');
+  const [questionAnswerText, setQuestionAnswerText] = useState('');
+  const [questionAnswerSpaceSize, setQuestionAnswerSpaceSize] = useState('MEDIUM');
   const [questionImageDrafts, setQuestionImageDrafts] = useState([]);
   const [questionAlternatives, setQuestionAlternatives] = useState([
     createAlternativeDraft(),
@@ -226,6 +256,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionTopicId(initialTopicId ?? '');
     setQuestionType('MULTIPLE_CHOICE');
     setQuestionText('');
+    setQuestionAnswerText('');
+    setQuestionAnswerSpaceSize('MEDIUM');
     setQuestionImageDrafts([]);
     setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
     setShowQuestionModal(true);
@@ -241,6 +273,18 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionDisciplineId(nextDisciplineId);
     const nextTopics = topicsByDiscipline[nextDisciplineId] ?? [];
     setQuestionTopicId(nextTopics[0]?.id ?? '');
+  }
+
+  function handleQuestionTypeChange(nextType) {
+    setQuestionType(nextType);
+
+    if (nextType === 'MULTIPLE_CHOICE') {
+      setQuestionAnswerText('');
+      setQuestionAnswerSpaceSize('MEDIUM');
+      return;
+    }
+
+    setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
   }
 
   function addAlternativeDraft() {
@@ -370,24 +414,38 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     if (!questionTopicId || !questionText.trim()) {
       return;
     }
+    const isMultipleChoice = questionType === 'MULTIPLE_CHOICE';
+    const normalizedAnswerText = questionAnswerText.trim();
 
-    const alternativesPayload = questionAlternatives
-      .map((alternative) => ({
-        type: alternative.type,
-        isCorrect: alternative.isCorrect,
-        text: alternative.text.trim(),
-        imageFile: alternative.imageFile,
-      }))
-      .filter((alternative) =>
-        alternative.type === 'IMAGE'
-          ? Boolean(alternative.imageFile)
-          : alternative.text.length > 0,
-      );
+    if (!isMultipleChoice) {
+      if (!normalizedAnswerText) {
+        setMessage('Para questão dissertativa, informe a resposta');
+        return;
+      }
 
-    if (alternativesPayload.length < 2) {
-      setMessage(
-        'Adicione ao menos 2 alternativas com texto ou imagem',
-      );
+      if (!questionAnswerSpaceSize) {
+        setMessage('Selecione o tamanho de espaço para a questão dissertativa');
+        return;
+      }
+    }
+
+    const alternativesPayload = isMultipleChoice
+      ? questionAlternatives
+          .map((alternative) => ({
+            type: alternative.type,
+            isCorrect: alternative.isCorrect,
+            text: alternative.text.trim(),
+            imageFile: alternative.imageFile,
+          }))
+          .filter((alternative) =>
+            alternative.type === 'IMAGE'
+              ? Boolean(alternative.imageFile)
+              : alternative.text.length > 0,
+          )
+      : [];
+
+    if (isMultipleChoice && alternativesPayload.length < 2) {
+      setMessage('Adicione ao menos 2 alternativas com texto ou imagem');
       return;
     }
 
@@ -395,13 +453,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       (alternative) => alternative.isCorrect,
     ).length;
 
-    if (correctCount < 1) {
+    if (isMultipleChoice && correctCount < 1) {
       setMessage('Marque ao menos 1 alternativa correta');
-      return;
-    }
-
-    if (questionType === 'TRUE_FALSE' && alternativesPayload.length !== 2) {
-      setMessage('Para TRUE_FALSE, informe exatamente 2 alternativas');
       return;
     }
 
@@ -409,7 +462,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       (alternative) => alternative.type === 'IMAGE' && !alternative.imageFile,
     );
 
-    if (invalidImageAlternative) {
+    if (isMultipleChoice && invalidImageAlternative) {
       setMessage('Alternativas IMAGE precisam de arquivo');
       return;
     }
@@ -437,63 +490,75 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         uploadedFileIds.push(uploadedFile.id);
       });
 
-      const alternativesPayloadWithImageIds = await Promise.all(
-        alternativesPayload.map(async (alternative) => {
-          if (alternative.type !== 'IMAGE') {
-            return {
-              text: alternative.text,
-              type: alternative.type,
-              isCorrect: alternative.isCorrect,
-              imageFileId: undefined,
-            };
-          }
-
-          const uploadedImage = await apiUploadFile('/uploaded-files/upload', {
-            token,
-            file: alternative.imageFile,
-          });
-          uploadedFileIds.push(uploadedImage.id);
-
-          return {
-            text: alternative.text,
-            type: alternative.type,
-            isCorrect: alternative.isCorrect,
-            imageFileId: uploadedImage.id,
-          };
-        }),
-      );
-
       createdQuestion = await apiRequest('/questions', {
         method: 'POST',
         token,
         body: {
           text: questionText.trim(),
           type: questionType,
+          ...(isMultipleChoice
+            ? {}
+            : {
+                answerText: normalizedAnswerText,
+                answerSpaceSize: questionAnswerSpaceSize,
+              }),
           topicId: questionTopicId,
           questionImageFileIds: questionImageUploads.map((uploaded) => uploaded.id),
         },
       });
 
-      await Promise.all(
-        alternativesPayloadWithImageIds.map((alternative) =>
-          apiRequest('/alternatives', {
-            method: 'POST',
-            token,
-            body: {
-              questionId: createdQuestion.id,
+      if (isMultipleChoice) {
+        const alternativesPayloadWithImageIds = await Promise.all(
+          alternativesPayload.map(async (alternative) => {
+            if (alternative.type !== 'IMAGE') {
+              return {
+                text: alternative.text,
+                type: alternative.type,
+                isCorrect: alternative.isCorrect,
+                imageFileId: undefined,
+              };
+            }
+
+            const uploadedImage = await apiUploadFile('/uploaded-files/upload', {
+              token,
+              file: alternative.imageFile,
+            });
+            uploadedFileIds.push(uploadedImage.id);
+
+            return {
               text: alternative.text,
               type: alternative.type,
               isCorrect: alternative.isCorrect,
-              ...(alternative.imageFileId
-                ? { imageFileId: alternative.imageFileId }
-                : {}),
-            },
+              imageFileId: uploadedImage.id,
+            };
           }),
-        ),
-      );
+        );
+
+        await Promise.all(
+          alternativesPayloadWithImageIds.map((alternative) =>
+            apiRequest('/alternatives', {
+              method: 'POST',
+              token,
+              body: {
+                questionId: createdQuestion.id,
+                text: alternative.text,
+                type: alternative.type,
+                isCorrect: alternative.isCorrect,
+                ...(alternative.imageFileId
+                  ? { imageFileId: alternative.imageFileId }
+                  : {}),
+              },
+            }),
+          ),
+        );
+      }
 
       closeAllModals();
-      setMessage('Questão e alternativas criadas com sucesso');
+      setMessage(
+        isMultipleChoice
+          ? 'Questão e alternativas criadas com sucesso'
+          : 'Questão dissertativa criada com sucesso',
+      );
       await loadData();
     } catch (error) {
       if (createdQuestion?.id) {
@@ -626,7 +691,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
               return (
                 <article key={question.id} className="kanban-item">
-                  <h3>{question.type}</h3>
+                  <h3>{formatQuestionType(question.type)}</h3>
                   <p>{question.text}</p>
 
                   {(question.questionImages ?? []).length > 0 ? (
@@ -648,27 +713,38 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                     {discipline?.name ?? '-'}
                   </p>
 
-                  <ul className="compact-list">
-                    {(question.alternatives ?? []).map((alternative, index) => (
-                      <li key={alternative.id}>
-                        {optionLetter(index)}.{' '}
-                        {alternative.type === 'IMAGE' && alternative.imageFileId ? (
-                          <span className="alternative-image-inline">
-                            <AuthenticatedImage
-                              token={token}
-                              fileId={alternative.imageFileId}
-                              alt={`Alternativa ${optionLetter(index)}`}
-                              className="alternative-image-preview"
-                            />
-                            {alternative.text ? <span>{alternative.text}</span> : null}
-                          </span>
-                        ) : (
-                          alternative.text
-                        )}{' '}
-                        {alternative.isCorrect ? '(correta)' : ''}
-                      </li>
-                    ))}
-                  </ul>
+                  {question.type === 'DISSERTATIVE' ? (
+                    <div className="form-grid">
+                      <p className="muted">
+                        Espaço de resposta: {formatAnswerSpaceSize(question.answerSpaceSize)}
+                      </p>
+                      <p>
+                        <strong>Resposta:</strong> {question.answerText || '-'}
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="compact-list">
+                      {(question.alternatives ?? []).map((alternative, index) => (
+                        <li key={alternative.id}>
+                          {optionLetter(index)}.{' '}
+                          {alternative.type === 'IMAGE' && alternative.imageFileId ? (
+                            <span className="alternative-image-inline">
+                              <AuthenticatedImage
+                                token={token}
+                                fileId={alternative.imageFileId}
+                                alt={`Alternativa ${optionLetter(index)}`}
+                                className="alternative-image-preview"
+                              />
+                              {alternative.text ? <span>{alternative.text}</span> : null}
+                            </span>
+                          ) : (
+                            alternative.text
+                          )}{' '}
+                          {alternative.isCorrect ? '(correta)' : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </article>
               );
             })}
@@ -773,7 +849,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         <div className="modal-overlay" onClick={closeAllModals}>
           <section className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Nova questão com alternativas</h2>
+              <h2>Nova questão</h2>
               <button type="button" className="ghost-btn" onClick={closeAllModals}>
                 Fechar
               </button>
@@ -818,10 +894,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
               <select
                 id="modal-question-type"
                 value={questionType}
-                onChange={(event) => setQuestionType(event.target.value)}
+                onChange={(event) => handleQuestionTypeChange(event.target.value)}
               >
-                <option value="MULTIPLE_CHOICE">MULTIPLE_CHOICE</option>
-                <option value="TRUE_FALSE">TRUE_FALSE</option>
+                <option value="MULTIPLE_CHOICE">Múltipla escolha</option>
+                <option value="DISSERTATIVE">Dissertativa</option>
               </select>
 
               <label htmlFor="modal-question-text">Texto da questão</label>
@@ -871,51 +947,77 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 </button>
               </fieldset>
 
-              <fieldset>
-                <legend>Alternativas</legend>
-                <div className="form-grid">
-                  {questionAlternatives.map((alternative, index) => (
-                    <div key={alternative.id} className="alt-row">
-                      {alternative.type === 'TEXT' ? (
-                        <label className="form-grid">
-                          <span>Texto da alternativa {optionLetter(index)}</span>
-                          <input
-                            type="text"
-                            value={alternative.text}
-                            onChange={(event) =>
-                              updateAlternativeDraft(alternative.id, {
-                                text: event.target.value,
-                              })
-                            }
-                            placeholder="Digite a alternativa"
-                          />
-                        </label>
-                      ) : (
-                        <label className="form-grid">
-                          <span>Imagem da alternativa {optionLetter(index)}</span>
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            onChange={(event) =>
-                              updateAlternativeDraft(alternative.id, {
-                                imageFile: event.target.files?.[0] ?? null,
-                              })
-                            }
-                          />
-                          {alternative.imageFile ? (
-                            <span className="muted">{alternative.imageFile.name}</span>
-                          ) : (
-                            <span className="muted">Selecione uma imagem</span>
-                          )}
-                        </label>
-                      )}
+              {questionType === 'DISSERTATIVE' ? (
+                <fieldset>
+                  <legend>Resposta</legend>
 
-                      <label className="form-grid">
-                        <span>Tipo</span>
-                        <select
-                          value={alternative.type}
-                          onChange={(event) =>
-                            {
+                  <label htmlFor="modal-question-answer-text">Texto da resposta</label>
+                  <textarea
+                    id="modal-question-answer-text"
+                    rows={4}
+                    value={questionAnswerText}
+                    onChange={(event) => setQuestionAnswerText(event.target.value)}
+                    required
+                  />
+
+                  <label htmlFor="modal-question-answer-space-size">
+                    Tamanho do espaco para resposta
+                  </label>
+                  <select
+                    id="modal-question-answer-space-size"
+                    value={questionAnswerSpaceSize}
+                    onChange={(event) => setQuestionAnswerSpaceSize(event.target.value)}
+                  >
+                    <option value="SMALL">Pequeno</option>
+                    <option value="MEDIUM">Médio</option>
+                    <option value="LARGE">Grande</option>
+                  </select>
+                </fieldset>
+              ) : (
+                <fieldset>
+                  <legend>Alternativas</legend>
+                  <div className="form-grid">
+                    {questionAlternatives.map((alternative, index) => (
+                      <div key={alternative.id} className="alt-row">
+                        {alternative.type === 'TEXT' ? (
+                          <label className="form-grid">
+                            <span>Texto da alternativa {optionLetter(index)}</span>
+                            <input
+                              type="text"
+                              value={alternative.text}
+                              onChange={(event) =>
+                                updateAlternativeDraft(alternative.id, {
+                                  text: event.target.value,
+                                })
+                              }
+                              placeholder="Digite a alternativa"
+                            />
+                          </label>
+                        ) : (
+                          <label className="form-grid">
+                            <span>Imagem da alternativa {optionLetter(index)}</span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={(event) =>
+                                updateAlternativeDraft(alternative.id, {
+                                  imageFile: event.target.files?.[0] ?? null,
+                                })
+                              }
+                            />
+                            {alternative.imageFile ? (
+                              <span className="muted">{alternative.imageFile.name}</span>
+                            ) : (
+                              <span className="muted">Selecione uma imagem</span>
+                            )}
+                          </label>
+                        )}
+
+                        <label className="form-grid">
+                          <span>Tipo</span>
+                          <select
+                            value={alternative.type}
+                            onChange={(event) => {
                               const nextType = event.target.value;
                               updateAlternativeDraft(alternative.id, {
                                 type: nextType,
@@ -923,43 +1025,47 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                                   ? { imageFile: null }
                                   : {}),
                               });
+                            }}
+                          >
+                            <option value="TEXT">TEXT</option>
+                            <option value="IMAGE">IMAGE</option>
+                          </select>
+                        </label>
+
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={alternative.isCorrect}
+                            onChange={(event) =>
+                              updateAlternativeDraft(alternative.id, {
+                                isCorrect: event.target.checked,
+                              })
                             }
-                          }
+                          />
+                          Correta
+                        </label>
+
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => removeAlternativeDraft(alternative.id)}
+                          disabled={questionAlternatives.length <= 2}
                         >
-                          <option value="TEXT">TEXT</option>
-                          <option value="IMAGE">IMAGE</option>
-                        </select>
-                      </label>
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
 
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={alternative.isCorrect}
-                          onChange={(event) =>
-                            updateAlternativeDraft(alternative.id, {
-                              isCorrect: event.target.checked,
-                            })
-                          }
-                        />
-                        Correta
-                      </label>
-
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => removeAlternativeDraft(alternative.id)}
-                        disabled={questionAlternatives.length <= 2}
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <button type="button" className="ghost-btn" onClick={addAlternativeDraft}>
-                  Adicionar alternativa
-                </button>
-              </fieldset>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={addAlternativeDraft}
+                  >
+                    Adicionar alternativa
+                  </button>
+                </fieldset>
+              )}
 
               <button
                 type="submit"

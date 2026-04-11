@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, QuestionType } from '@prisma/client';
+import { AnswerSpaceSize, Prisma, QuestionType } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import {
   AuthTokenPayload,
@@ -37,6 +37,8 @@ type QuestionForCreation = {
 type QuestionForOrder = {
   id: string;
   type: QuestionType;
+  answerText: string | null;
+  answerSpaceSize: AnswerSpaceSize | null;
   alternatives: Array<{ id: string; isCorrect: boolean }>;
 };
 
@@ -190,15 +192,25 @@ export class ExamsService {
         (alternative) => alternative.isCorrect,
       ).length;
 
+      if (question.type === QuestionType.DISSERTATIVE) {
+        if (!question.answerText || !question.answerSpaceSize) {
+          throw new BadRequestException(
+            `Question ${question.id} must include answerText and answerSpaceSize for DISSERTATIVE`,
+          );
+        }
+
+        if (totalAlternatives > 0) {
+          throw new BadRequestException(
+            `Question ${question.id} cannot have alternatives for DISSERTATIVE`,
+          );
+        }
+
+        continue;
+      }
+
       if (totalAlternatives < 2) {
         throw new BadRequestException(
           `Question ${question.id} must have at least 2 alternatives`,
-        );
-      }
-
-      if (question.type === QuestionType.TRUE_FALSE && totalAlternatives !== 2) {
-        throw new BadRequestException(
-          `Question ${question.id} must have exactly 2 alternatives for TRUE_FALSE`,
         );
       }
 
@@ -254,6 +266,8 @@ export class ExamsService {
         select: {
           id: true,
           type: true,
+          answerText: true,
+          answerSpaceSize: true,
           alternatives: {
             orderBy: { createdAt: 'asc' },
             select: { id: true, isCorrect: true },

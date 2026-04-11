@@ -83,18 +83,15 @@ async function main() {
     },
   });
 
-  // Question 2: True/False
+  // Question 2: Dissertative
   const question2 = await prisma.question.create({
     data: {
-      text: 'O Sol é uma estrela?',
-      type: QuestionType.TRUE_FALSE,
+      text: 'Explique o conceito de recursao e cite um exemplo pratico.',
+      type: QuestionType.DISSERTATIVE,
+      answerText:
+        'Recursao e uma tecnica em que uma funcao chama a si mesma ate atingir um caso base.',
+      answerSpaceSize: 'MEDIUM',
       topicId: topic.id,
-      alternatives: {
-        create: [
-          { text: 'Verdadeiro', type: AlternativeType.TEXT, isCorrect: true },
-          { text: 'Falso', type: AlternativeType.TEXT, isCorrect: false },
-        ],
-      },
     },
   });
 

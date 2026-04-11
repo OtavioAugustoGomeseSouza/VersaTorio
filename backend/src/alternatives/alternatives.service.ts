@@ -8,7 +8,7 @@ import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { AlternativeEntity } from './entities/alternative.etity';
 import { plainToInstance } from 'class-transformer';
-import { AlternativeType } from '@prisma/client';
+import { AlternativeType, QuestionType } from '@prisma/client';
 import {
   AuthTokenPayload,
   UserRole,
@@ -22,10 +22,10 @@ export class AlternativesService {
     return authUser.role === UserRole.admin;
   }
 
-  private async ensureQuestionAccess(
+  private async getAccessibleQuestion(
     questionId: string,
     authUser: AuthTokenPayload,
-  ): Promise<void> {
+  ) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
@@ -46,6 +46,8 @@ export class AlternativesService {
     ) {
       throw new NotFoundException(`Question with ID ${questionId} not found`);
     }
+
+    return question;
   }
 
   private async ensureUploadedFileAccess(
@@ -190,7 +192,17 @@ export class AlternativesService {
     createAlternativeDto: CreateAlternativeDto,
     authUser: AuthTokenPayload,
   ): Promise<AlternativeEntity> {
-    await this.ensureQuestionAccess(createAlternativeDto.questionId, authUser);
+    const question = await this.getAccessibleQuestion(
+      createAlternativeDto.questionId,
+      authUser,
+    );
+
+    if (question.type !== QuestionType.MULTIPLE_CHOICE) {
+      throw new BadRequestException(
+        'Alternatives can only be added to MULTIPLE_CHOICE questions',
+      );
+    }
+
     const data = await this.buildValidatedCreateData(createAlternativeDto, authUser);
 
     const alternative = await this.prisma.alternative.create({
@@ -232,10 +244,16 @@ export class AlternativesService {
     const existingAlternative = await this.getAlternativeWithAccess(id, authUser);
 
     if (updateAlternativeDto.questionId) {
-      await this.ensureQuestionAccess(
+      const targetQuestion = await this.getAccessibleQuestion(
         updateAlternativeDto.questionId,
         authUser,
       );
+
+      if (targetQuestion.type !== QuestionType.MULTIPLE_CHOICE) {
+        throw new BadRequestException(
+          'Alternatives can only be linked to MULTIPLE_CHOICE questions',
+        );
+      }
     }
 
     const data = await this.buildValidatedUpdateData(

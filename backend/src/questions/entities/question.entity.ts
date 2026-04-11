@@ -11,14 +11,22 @@ export class QuestionImageEntity {
 }
 
 export enum QuestionType {
-  TRUE_FALSE = 'TRUE_FALSE',
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
+  DISSERTATIVE = 'DISSERTATIVE',
+}
+
+export enum AnswerSpaceSize {
+  SMALL = 'SMALL',
+  MEDIUM = 'MEDIUM',
+  LARGE = 'LARGE',
 }
 
 export class QuestionEntity {
   id: string;
   text: string;
   type: QuestionType;
+  answerText?: string | null;
+  answerSpaceSize?: AnswerSpaceSize | null;
   createdAt: Date;
   updatedAt: Date;
   topicId: string;
