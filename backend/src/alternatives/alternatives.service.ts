@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { AlternativeEntity } from './entities/alternative.etity';
 import { plainToInstance } from 'class-transformer';
+import { AlternativeType } from '@prisma/client';
 import {
   AuthTokenPayload,
   UserRole,
@@ -43,39 +48,78 @@ export class AlternativesService {
     }
   }
 
-  async create(
+  private async ensureUploadedFileAccess(
+    uploadedFileId: string,
+    authUser: AuthTokenPayload,
+  ): Promise<void> {
+    const uploadedFile = await this.prisma.uploadedFile.findUnique({
+      where: { id: uploadedFileId },
+    });
+
+    if (
+      !uploadedFile ||
+      (!this.isAdmin(authUser) && uploadedFile.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(
+        `Uploaded file with ID ${uploadedFileId} not found`,
+      );
+    }
+  }
+
+  private validateCreatePayload(createAlternativeDto: CreateAlternativeDto): void {
+    const text = createAlternativeDto.text?.trim() ?? '';
+
+    if (createAlternativeDto.type === AlternativeType.TEXT && text.length === 0) {
+      throw new BadRequestException('TEXT alternatives must have non-empty text');
+    }
+
+    if (
+      createAlternativeDto.type === AlternativeType.TEXT &&
+      createAlternativeDto.imageFileId
+    ) {
+      throw new BadRequestException(
+        'TEXT alternatives cannot include imageFileId',
+      );
+    }
+
+    if (
+      createAlternativeDto.type === AlternativeType.IMAGE &&
+      !createAlternativeDto.imageFileId
+    ) {
+      throw new BadRequestException(
+        'IMAGE alternatives must include imageFileId',
+      );
+    }
+  }
+
+  private async buildValidatedCreateData(
     createAlternativeDto: CreateAlternativeDto,
     authUser: AuthTokenPayload,
-  ): Promise<AlternativeEntity> {
-    await this.ensureQuestionAccess(createAlternativeDto.questionId, authUser);
+  ) {
+    this.validateCreatePayload(createAlternativeDto);
 
-    const alternative = await this.prisma.alternative.create({
-      data: createAlternativeDto,
-    });
-    return plainToInstance(AlternativeEntity, alternative);
+    if (createAlternativeDto.imageFileId) {
+      await this.ensureUploadedFileAccess(createAlternativeDto.imageFileId, authUser);
+    }
+
+    const normalizedText = createAlternativeDto.text?.trim() ?? '';
+
+    return {
+      text: normalizedText,
+      type: createAlternativeDto.type,
+      isCorrect: createAlternativeDto.isCorrect,
+      questionId: createAlternativeDto.questionId,
+      imageFileId:
+        createAlternativeDto.type === AlternativeType.IMAGE
+          ? createAlternativeDto.imageFileId ?? null
+          : null,
+    };
   }
 
-  async findAll(authUser: AuthTokenPayload): Promise<AlternativeEntity[]> {
-    const alternatives = await this.prisma.alternative.findMany({
-      where: this.isAdmin(authUser)
-        ? undefined
-        : {
-            question: {
-              topic: {
-                discipline: {
-                  userId: authUser.id,
-                },
-              },
-            },
-          },
-    });
-    return plainToInstance(AlternativeEntity, alternatives);
-  }
-
-  async findOne(
+  private async getAlternativeWithAccess(
     id: string,
     authUser: AuthTokenPayload,
-  ): Promise<AlternativeEntity> {
+  ) {
     const alternative = await this.prisma.alternative.findUnique({
       where: { id },
       include: {
@@ -101,6 +145,82 @@ export class AlternativesService {
       throw new NotFoundException(`Alternative with ID ${id} not found`);
     }
 
+    return alternative;
+  }
+
+  private async buildValidatedUpdateData(
+    existingAlternative: Awaited<
+      ReturnType<AlternativesService['getAlternativeWithAccess']>
+    >,
+    updateAlternativeDto: UpdateAlternativeDto,
+    authUser: AuthTokenPayload,
+  ) {
+    const nextType = updateAlternativeDto.type ?? existingAlternative.type;
+    const nextText =
+      updateAlternativeDto.text !== undefined
+        ? updateAlternativeDto.text.trim()
+        : existingAlternative.text;
+    const nextImageFileId =
+      updateAlternativeDto.imageFileId ?? existingAlternative.imageFileId;
+
+    if (nextType === AlternativeType.TEXT) {
+      if (nextText.length === 0) {
+        throw new BadRequestException('TEXT alternatives must have non-empty text');
+      }
+    }
+
+    if (nextType === AlternativeType.IMAGE && !nextImageFileId) {
+      throw new BadRequestException('IMAGE alternatives must include imageFileId');
+    }
+
+    if (nextImageFileId) {
+      await this.ensureUploadedFileAccess(nextImageFileId, authUser);
+    }
+
+    return {
+      text: nextText,
+      type: nextType,
+      isCorrect: updateAlternativeDto.isCorrect ?? existingAlternative.isCorrect,
+      questionId: updateAlternativeDto.questionId ?? existingAlternative.questionId,
+      imageFileId: nextType === AlternativeType.IMAGE ? nextImageFileId : null,
+    };
+  }
+
+  async create(
+    createAlternativeDto: CreateAlternativeDto,
+    authUser: AuthTokenPayload,
+  ): Promise<AlternativeEntity> {
+    await this.ensureQuestionAccess(createAlternativeDto.questionId, authUser);
+    const data = await this.buildValidatedCreateData(createAlternativeDto, authUser);
+
+    const alternative = await this.prisma.alternative.create({
+      data,
+    });
+    return plainToInstance(AlternativeEntity, alternative);
+  }
+
+  async findAll(authUser: AuthTokenPayload): Promise<AlternativeEntity[]> {
+    const alternatives = await this.prisma.alternative.findMany({
+      where: this.isAdmin(authUser)
+        ? undefined
+        : {
+            question: {
+              topic: {
+                discipline: {
+                  userId: authUser.id,
+                },
+              },
+            },
+          },
+    });
+    return plainToInstance(AlternativeEntity, alternatives);
+  }
+
+  async findOne(
+    id: string,
+    authUser: AuthTokenPayload,
+  ): Promise<AlternativeEntity> {
+    const alternative = await this.getAlternativeWithAccess(id, authUser);
     return plainToInstance(AlternativeEntity, alternative);
   }
 
@@ -109,7 +229,7 @@ export class AlternativesService {
     updateAlternativeDto: UpdateAlternativeDto,
     authUser: AuthTokenPayload,
   ): Promise<AlternativeEntity> {
-    await this.findOne(id, authUser);
+    const existingAlternative = await this.getAlternativeWithAccess(id, authUser);
 
     if (updateAlternativeDto.questionId) {
       await this.ensureQuestionAccess(
@@ -118,9 +238,15 @@ export class AlternativesService {
       );
     }
 
+    const data = await this.buildValidatedUpdateData(
+      existingAlternative,
+      updateAlternativeDto,
+      authUser,
+    );
+
     const alternative = await this.prisma.alternative.update({
       where: { id },
-      data: updateAlternativeDto,
+      data,
     });
     return plainToInstance(AlternativeEntity, alternative);
   }

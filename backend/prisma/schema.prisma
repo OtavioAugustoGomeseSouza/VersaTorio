@@ -87,6 +87,7 @@ model Question {
   topicId       String
   alternatives  Alternative[]
   examQuestions ExamQuestion[]
+  questionImages QuestionImage[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -122,10 +123,12 @@ model Alternative {
   type       AlternativeType
   isCorrect  Boolean
   questionId String
+  imageFileId String?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  imageFile UploadedFile? @relation("AlternativeImageFile", fields: [imageFileId], references: [id])
 }
 
 model UploadedFile {
@@ -138,6 +141,23 @@ model UploadedFile {
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionImages QuestionImage[] @relation("QuestionImageFile")
+  alternativeImages Alternative[] @relation("AlternativeImageFile")
 
   @@index([userId])
+}
+
+model QuestionImage {
+  id         String   @id @default(uuid())
+  questionId String
+  fileId     String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  file     UploadedFile @relation("QuestionImageFile", fields: [fileId], references: [id])
+
+  @@unique([questionId, fileId])
+  @@index([questionId])
+  @@index([fileId])
 }

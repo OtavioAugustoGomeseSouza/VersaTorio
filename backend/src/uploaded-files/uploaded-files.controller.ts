@@ -60,10 +60,13 @@ export class UploadedFilesController {
     const authUser = request.user;
     const content = await this.uploadedFilesService.getContentData(id, authUser);
     const safeFilename = content.originalName.replace(/["\\/\r\n]/g, '_');
+    const dispositionType = content.mimeType.startsWith('image/')
+      ? 'inline'
+      : 'attachment';
 
     return new StreamableFile(createReadStream(content.absolutePath), {
       type: content.mimeType,
-      disposition: `attachment; filename="${safeFilename}"`,
+      disposition: `${dispositionType}; filename="${safeFilename}"`,
     });
   }
 

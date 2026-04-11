@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiRequest } from '../lib/api';
+import { API_URL, apiRequest, apiUploadFile } from '../lib/api';
 
 function optionLetter(index) {
   return String.fromCharCode(65 + index);
@@ -11,7 +11,64 @@ function createAlternativeDraft() {
     text: '',
     type: 'TEXT',
     isCorrect: false,
+    imageFile: null,
   };
+}
+
+function createQuestionImageDraft() {
+  return {
+    id: `qimg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    file: null,
+  };
+}
+
+function AuthenticatedImage({ token, fileId, alt, className }) {
+  const [imageSrc, setImageSrc] = useState('');
+
+  useEffect(() => {
+    let objectUrl = '';
+    let isCancelled = false;
+
+    async function loadImage() {
+      try {
+        const response = await fetch(`${API_URL}/uploaded-files/${fileId}/content`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image request failed (${response.status})`);
+        }
+
+        const imageBlob = await response.blob();
+        objectUrl = URL.createObjectURL(imageBlob);
+
+        if (!isCancelled) {
+          setImageSrc(objectUrl);
+        }
+      } catch {
+        if (!isCancelled) {
+          setImageSrc('');
+        }
+      }
+    }
+
+    loadImage();
+
+    return () => {
+      isCancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [fileId, token]);
+
+  if (!imageSrc) {
+    return <span className="muted">{alt}</span>;
+  }
+
+  return <img src={imageSrc} alt={alt} className={className} />;
 }
 
 export default function QuestionsPage({ token, onUnauthorized }) {
@@ -34,6 +91,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [questionTopicId, setQuestionTopicId] = useState('');
   const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
   const [questionText, setQuestionText] = useState('');
+  const [questionImageDrafts, setQuestionImageDrafts] = useState([]);
   const [questionAlternatives, setQuestionAlternatives] = useState([
     createAlternativeDraft(),
     createAlternativeDraft(),
@@ -168,6 +226,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionTopicId(initialTopicId ?? '');
     setQuestionType('MULTIPLE_CHOICE');
     setQuestionText('');
+    setQuestionImageDrafts([]);
     setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
     setShowQuestionModal(true);
   }
@@ -186,6 +245,26 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
   function addAlternativeDraft() {
     setQuestionAlternatives((current) => [...current, createAlternativeDraft()]);
+  }
+
+  function addQuestionImageDraft() {
+    setQuestionImageDrafts((current) => [...current, createQuestionImageDraft()]);
+  }
+
+  function removeQuestionImageDraft(imageDraftId) {
+    setQuestionImageDrafts((current) =>
+      current.filter((imageDraft) => imageDraft.id !== imageDraftId),
+    );
+  }
+
+  function updateQuestionImageDraft(imageDraftId, changes) {
+    setQuestionImageDrafts((current) =>
+      current.map((imageDraft) =>
+        imageDraft.id === imageDraftId
+          ? { ...imageDraft, ...changes }
+          : imageDraft,
+      ),
+    );
   }
 
   function removeAlternativeDraft(alternativeId) {
@@ -294,14 +373,21 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
     const alternativesPayload = questionAlternatives
       .map((alternative) => ({
-        text: alternative.text.trim(),
         type: alternative.type,
         isCorrect: alternative.isCorrect,
+        text: alternative.text.trim(),
+        imageFile: alternative.imageFile,
       }))
-      .filter((alternative) => alternative.text.length > 0);
+      .filter((alternative) =>
+        alternative.type === 'IMAGE'
+          ? Boolean(alternative.imageFile)
+          : alternative.text.length > 0,
+      );
 
     if (alternativesPayload.length < 2) {
-      setMessage('Adicione ao menos 2 alternativas com texto');
+      setMessage(
+        'Adicione ao menos 2 alternativas com texto ou imagem',
+      );
       return;
     }
 
@@ -319,12 +405,64 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       return;
     }
 
+    const invalidImageAlternative = alternativesPayload.find(
+      (alternative) => alternative.type === 'IMAGE' && !alternative.imageFile,
+    );
+
+    if (invalidImageAlternative) {
+      setMessage('Alternativas IMAGE precisam de arquivo');
+      return;
+    }
+
     setSavingQuestion(true);
     setMessage('');
 
     let createdQuestion;
+    const uploadedFileIds = [];
 
     try {
+      const questionImageUploads = await Promise.all(
+        questionImageDrafts
+          .map((imageDraft) => imageDraft.file)
+          .filter(Boolean)
+          .map((file) =>
+            apiUploadFile('/uploaded-files/upload', {
+              token,
+              file,
+            }),
+          ),
+      );
+
+      questionImageUploads.forEach((uploadedFile) => {
+        uploadedFileIds.push(uploadedFile.id);
+      });
+
+      const alternativesPayloadWithImageIds = await Promise.all(
+        alternativesPayload.map(async (alternative) => {
+          if (alternative.type !== 'IMAGE') {
+            return {
+              text: alternative.text,
+              type: alternative.type,
+              isCorrect: alternative.isCorrect,
+              imageFileId: undefined,
+            };
+          }
+
+          const uploadedImage = await apiUploadFile('/uploaded-files/upload', {
+            token,
+            file: alternative.imageFile,
+          });
+          uploadedFileIds.push(uploadedImage.id);
+
+          return {
+            text: alternative.text,
+            type: alternative.type,
+            isCorrect: alternative.isCorrect,
+            imageFileId: uploadedImage.id,
+          };
+        }),
+      );
+
       createdQuestion = await apiRequest('/questions', {
         method: 'POST',
         token,
@@ -332,11 +470,12 @@ export default function QuestionsPage({ token, onUnauthorized }) {
           text: questionText.trim(),
           type: questionType,
           topicId: questionTopicId,
+          questionImageFileIds: questionImageUploads.map((uploaded) => uploaded.id),
         },
       });
 
       await Promise.all(
-        alternativesPayload.map((alternative) =>
+        alternativesPayloadWithImageIds.map((alternative) =>
           apiRequest('/alternatives', {
             method: 'POST',
             token,
@@ -345,6 +484,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
               text: alternative.text,
               type: alternative.type,
               isCorrect: alternative.isCorrect,
+              ...(alternative.imageFileId
+                ? { imageFileId: alternative.imageFileId }
+                : {}),
             },
           }),
         ),
@@ -363,6 +505,17 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         } catch {
           // noop
         }
+      }
+
+      if (uploadedFileIds.length > 0) {
+        await Promise.allSettled(
+          uploadedFileIds.map((fileId) =>
+            apiRequest(`/uploaded-files/${fileId}`, {
+              method: 'DELETE',
+              token,
+            }),
+          ),
+        );
       }
 
       if (error.status === 401) {
@@ -475,6 +628,21 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 <article key={question.id} className="kanban-item">
                   <h3>{question.type}</h3>
                   <p>{question.text}</p>
+
+                  {(question.questionImages ?? []).length > 0 ? (
+                    <div className="question-images-grid">
+                      {question.questionImages.map((questionImage, index) => (
+                        <AuthenticatedImage
+                          key={questionImage.id}
+                          token={token}
+                          fileId={questionImage.fileId}
+                          alt={`Imagem da questão ${index + 1}`}
+                          className="question-image-preview"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+
                   <p className="muted">
                     Tópico: {topic?.name ?? '-'} | Disciplina:{' '}
                     {discipline?.name ?? '-'}
@@ -483,7 +651,20 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                   <ul className="compact-list">
                     {(question.alternatives ?? []).map((alternative, index) => (
                       <li key={alternative.id}>
-                        {optionLetter(index)}. {alternative.text}{' '}
+                        {optionLetter(index)}.{' '}
+                        {alternative.type === 'IMAGE' && alternative.imageFileId ? (
+                          <span className="alternative-image-inline">
+                            <AuthenticatedImage
+                              token={token}
+                              fileId={alternative.imageFileId}
+                              alt={`Alternativa ${optionLetter(index)}`}
+                              className="alternative-image-preview"
+                            />
+                            {alternative.text ? <span>{alternative.text}</span> : null}
+                          </span>
+                        ) : (
+                          alternative.text
+                        )}{' '}
                         {alternative.isCorrect ? '(correta)' : ''}
                       </li>
                     ))}
@@ -653,32 +834,96 @@ export default function QuestionsPage({ token, onUnauthorized }) {
               />
 
               <fieldset>
+                <legend>Imagens da questão</legend>
+                <div className="form-grid">
+                  {questionImageDrafts.map((questionImage, index) => (
+                    <div key={questionImage.id} className="upload-row">
+                      <label className="form-grid">
+                        <span>Imagem {index + 1}</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) =>
+                            updateQuestionImageDraft(questionImage.id, {
+                              file: event.target.files?.[0] ?? null,
+                            })
+                          }
+                        />
+                      </label>
+                      {questionImage.file ? (
+                        <p className="muted">Arquivo: {questionImage.file.name}</p>
+                      ) : (
+                        <p className="muted">Selecione uma imagem</p>
+                      )}
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => removeQuestionImageDraft(questionImage.id)}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button type="button" className="ghost-btn" onClick={addQuestionImageDraft}>
+                  + Adicionar imagem
+                </button>
+              </fieldset>
+
+              <fieldset>
                 <legend>Alternativas</legend>
                 <div className="form-grid">
                   {questionAlternatives.map((alternative, index) => (
                     <div key={alternative.id} className="alt-row">
-                      <label className="form-grid">
-                        <span>Texto da alternativa {optionLetter(index)}</span>
-                        <input
-                          type="text"
-                          value={alternative.text}
-                          onChange={(event) =>
-                            updateAlternativeDraft(alternative.id, {
-                              text: event.target.value,
-                            })
-                          }
-                          placeholder="Digite a alternativa"
-                        />
-                      </label>
+                      {alternative.type === 'TEXT' ? (
+                        <label className="form-grid">
+                          <span>Texto da alternativa {optionLetter(index)}</span>
+                          <input
+                            type="text"
+                            value={alternative.text}
+                            onChange={(event) =>
+                              updateAlternativeDraft(alternative.id, {
+                                text: event.target.value,
+                              })
+                            }
+                            placeholder="Digite a alternativa"
+                          />
+                        </label>
+                      ) : (
+                        <label className="form-grid">
+                          <span>Imagem da alternativa {optionLetter(index)}</span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={(event) =>
+                              updateAlternativeDraft(alternative.id, {
+                                imageFile: event.target.files?.[0] ?? null,
+                              })
+                            }
+                          />
+                          {alternative.imageFile ? (
+                            <span className="muted">{alternative.imageFile.name}</span>
+                          ) : (
+                            <span className="muted">Selecione uma imagem</span>
+                          )}
+                        </label>
+                      )}
 
                       <label className="form-grid">
                         <span>Tipo</span>
                         <select
                           value={alternative.type}
                           onChange={(event) =>
-                            updateAlternativeDraft(alternative.id, {
-                              type: event.target.value,
-                            })
+                            {
+                              const nextType = event.target.value;
+                              updateAlternativeDraft(alternative.id, {
+                                type: nextType,
+                                ...(nextType === 'TEXT'
+                                  ? { imageFile: null }
+                                  : {}),
+                              });
+                            }
                           }
                         >
                           <option value="TEXT">TEXT</option>

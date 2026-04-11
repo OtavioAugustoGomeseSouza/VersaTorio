@@ -210,13 +210,27 @@ export class UploadedFilesService {
     const uploadedFile = await this.ensureFileAccess(id, authUser);
     const absolutePath = this.resolveAbsolutePath(uploadedFile.storageKey);
 
+    try {
+      await this.prisma.uploadedFile.delete({ where: { id: uploadedFile.id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Cannot delete uploaded file because it is linked to other records',
+        );
+      }
+
+      throw error;
+    }
+
     await unlink(absolutePath).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== 'ENOENT') {
         throw error;
       }
     });
 
-    await this.prisma.uploadedFile.delete({ where: { id: uploadedFile.id } });
     return this.toEntity(uploadedFile);
   }
 }

@@ -11,6 +11,7 @@ export class AlternativeEntity {
   type: AlternativeType;
   isCorrect: boolean;
   questionId: string;
+  imageFileId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 

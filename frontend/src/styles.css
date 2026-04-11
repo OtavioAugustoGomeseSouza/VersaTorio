@@ -485,6 +485,43 @@ legend {
   background: #fff;
 }
 
+.upload-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
+  background: #fff;
+}
+
+.question-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.55rem;
+}
+
+.question-image-preview,
+.alternative-image-preview {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f4f7f1;
+}
+
+.alternative-image-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alternative-image-inline .alternative-image-preview {
+  width: 64px;
+  height: 64px;
+  max-height: 64px;
+}
+
 .inline-actions {
   display: flex;
   gap: 0.5rem;

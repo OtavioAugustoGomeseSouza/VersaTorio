@@ -50,3 +50,37 @@ export async function apiRequest(path, options = {}) {
 
   return data;
 }
+
+export async function apiUploadFile(path, { token = '', file, fieldName = 'file' }) {
+  if (!file) {
+    throw new Error('Arquivo não informado para upload');
+  }
+
+  const formData = new FormData();
+  formData.append(fieldName, file);
+
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const data = await parseJson(response);
+
+  if (!response.ok) {
+    const backendMessage = Array.isArray(data?.message)
+      ? data.message.join(', ')
+      : data?.message;
+
+    const error = new Error(
+      backendMessage ?? `Request failed (${response.status})`,
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
+}

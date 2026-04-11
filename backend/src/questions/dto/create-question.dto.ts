@@ -1,6 +1,9 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
@@ -17,4 +20,10 @@ export class CreateQuestionDto {
   @IsUUID()
   @IsNotEmpty()
   topicId: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  questionImageFileIds?: string[];
 }
