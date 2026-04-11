@@ -3,12 +3,32 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { QuestionType } from '@prisma/client';
+import {
+  AnswerSpaceSize,
+  AlternativeType,
+  Prisma,
+  QuestionType,
+} from '@prisma/client';
+import { readFile } from 'fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AuthTokenPayload,
   UserRole,
 } from '../auth/interfaces/auth-token-payload.interface';
+import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
+import { UploadedFilesService } from '../uploaded-files/uploaded-files.service';
+
+type PdfDocumentNode = Record<string, unknown>;
+type PdfMake = {
+  addFonts(fonts: Record<string, unknown>): void;
+  setUrlAccessPolicy(callback: (url: string) => boolean): void;
+  createPdf(docDefinition: Record<string, unknown>): {
+    getBuffer(): Promise<Buffer>;
+  };
+};
+
+const pdfMake = require('pdfmake') as PdfMake;
+let isPdfMakeConfigured = false;
 
 type ExamVersionOrderData = {
   questions: Array<{
@@ -23,10 +43,40 @@ type ExamVersionOrderData = {
 type AccessibleExam = Awaited<
   ReturnType<ExamVersionsService['getAccessibleExam']>
 >;
+type AccessibleExamVersionForPdf = Awaited<
+  ReturnType<ExamVersionsService['getAccessibleExamVersionForPdf']>
+>;
+type ExamQuestionForPdf =
+  AccessibleExamVersionForPdf['exam']['examQuestions'][number]['question'];
+type ExamAlternativeForPdf = ExamQuestionForPdf['alternatives'][number];
+type OrderedQuestion = ExamVersionOrderData['questions'][number];
 
 @Injectable()
 export class ExamVersionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadedFilesService: UploadedFilesService,
+  ) {
+    this.configurePdfMake();
+  }
+
+  private configurePdfMake(): void {
+    if (isPdfMakeConfigured) {
+      return;
+    }
+
+    pdfMake.addFonts({
+      Roboto: {
+        normal: require.resolve('pdfmake/fonts/Roboto/Roboto-Regular.ttf'),
+        bold: require.resolve('pdfmake/fonts/Roboto/Roboto-Medium.ttf'),
+        italics: require.resolve('pdfmake/fonts/Roboto/Roboto-Italic.ttf'),
+        bolditalics:
+          require.resolve('pdfmake/fonts/Roboto/Roboto-MediumItalic.ttf'),
+      },
+    });
+    pdfMake.setUrlAccessPolicy(() => false);
+    isPdfMakeConfigured = true;
+  }
 
   private isAdmin(authUser: AuthTokenPayload): boolean {
     return authUser.role === UserRole.admin;
@@ -61,6 +111,61 @@ export class ExamVersionsService {
     }
 
     return exam;
+  }
+
+  private async getAccessibleExamVersionForPdf(
+    id: string,
+    authUser: AuthTokenPayload,
+  ) {
+    const examVersion = await this.prisma.examVersion.findUnique({
+      where: { id },
+      include: {
+        exam: {
+          include: {
+            discipline: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            examQuestions: {
+              include: {
+                question: {
+                  include: {
+                    alternatives: {
+                      orderBy: [{ createdAt: 'asc' }],
+                    },
+                    questionImages: {
+                      orderBy: [{ position: 'asc' }],
+                    },
+                    topic: {
+                      select: {
+                        name: true,
+                        discipline: {
+                          select: {
+                            id: true,
+                            name: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (
+      !examVersion ||
+      (!this.isAdmin(authUser) && examVersion.exam.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Exam version with ID ${id} not found`);
+    }
+
+    return examVersion;
   }
 
   private validateExamQuestionsForGeneration(exam: AccessibleExam): void {
@@ -179,6 +284,463 @@ export class ExamVersionsService {
     }
 
     return copy;
+  }
+
+  private parseOrderData(orderData: Prisma.JsonValue): ExamVersionOrderData {
+    if (
+      !orderData ||
+      typeof orderData !== 'object' ||
+      Array.isArray(orderData) ||
+      !Array.isArray((orderData as { questions?: unknown }).questions)
+    ) {
+      throw new BadRequestException('Exam version orderData is invalid');
+    }
+
+    const questions = (orderData as { questions: unknown[] }).questions.map(
+      (question) => {
+        if (
+          !question ||
+          typeof question !== 'object' ||
+          Array.isArray(question)
+        ) {
+          throw new BadRequestException(
+            'Exam version question order is invalid',
+          );
+        }
+
+        const parsedQuestion = question as {
+          questionId?: unknown;
+          position?: unknown;
+          alternatives?: unknown;
+        };
+
+        if (
+          typeof parsedQuestion.questionId !== 'string' ||
+          typeof parsedQuestion.position !== 'number' ||
+          !Array.isArray(parsedQuestion.alternatives)
+        ) {
+          throw new BadRequestException(
+            'Exam version question order is invalid',
+          );
+        }
+
+        const alternatives = parsedQuestion.alternatives.map((alternative) => {
+          if (
+            !alternative ||
+            typeof alternative !== 'object' ||
+            Array.isArray(alternative)
+          ) {
+            throw new BadRequestException(
+              'Exam version alternative order is invalid',
+            );
+          }
+
+          const parsedAlternative = alternative as {
+            alternativeId?: unknown;
+            position?: unknown;
+          };
+
+          if (
+            typeof parsedAlternative.alternativeId !== 'string' ||
+            typeof parsedAlternative.position !== 'number'
+          ) {
+            throw new BadRequestException(
+              'Exam version alternative order is invalid',
+            );
+          }
+
+          return {
+            alternativeId: parsedAlternative.alternativeId,
+            position: parsedAlternative.position,
+          };
+        });
+
+        return {
+          questionId: parsedQuestion.questionId,
+          position: parsedQuestion.position,
+          alternatives,
+        };
+      },
+    );
+
+    return {
+      questions: questions.sort(
+        (first, second) => first.position - second.position,
+      ),
+    };
+  }
+
+  private buildQuestionMap(
+    examVersion: AccessibleExamVersionForPdf,
+  ): Map<string, ExamQuestionForPdf> {
+    return new Map(
+      examVersion.exam.examQuestions.map((examQuestion) => [
+        examQuestion.question.id,
+        examQuestion.question,
+      ]),
+    );
+  }
+
+  private buildHeaderTable(
+    generatePdfDto: GenerateExamVersionPdfDto,
+  ): PdfDocumentNode {
+    const fields = generatePdfDto.headerFields.map((field) => ({
+      label: field.label.trim(),
+      value: field.value?.trim() ?? '',
+    }));
+
+    const rows: PdfDocumentNode[][] = [];
+    for (let index = 0; index < fields.length; index += 2) {
+      const rowFields = fields.slice(index, index + 2);
+      rows.push(
+        [0, 1].map((rowIndex) => {
+          const field = rowFields[rowIndex];
+
+          if (!field) {
+            return { text: '', border: [false, false, false, false] };
+          }
+
+          return {
+            text: [
+              { text: `${field.label}: `, bold: true },
+              field.value || '______________________________',
+            ],
+            margin: [6, 6, 6, 6],
+          };
+        }),
+      );
+    }
+
+    return {
+      table: {
+        widths: ['*', '*'],
+        body: rows,
+      },
+      layout: {
+        hLineColor: () => '#cbd5cc',
+        vLineColor: () => '#cbd5cc',
+      },
+      margin: [0, 0, 0, 12],
+    };
+  }
+
+  private async loadPdfImage(
+    fileId: string,
+    authUser: AuthTokenPayload,
+  ): Promise<string | null> {
+    const content = await this.uploadedFilesService.getContentData(
+      fileId,
+      authUser,
+    );
+
+    if (!['image/png', 'image/jpeg'].includes(content.mimeType)) {
+      return null;
+    }
+
+    const imageBuffer = await readFile(content.absolutePath);
+    return `data:${content.mimeType};base64,${imageBuffer.toString('base64')}`;
+  }
+
+  private buildAlternativeMap(
+    alternatives: ExamAlternativeForPdf[],
+  ): Map<string, ExamAlternativeForPdf> {
+    return new Map(
+      alternatives.map((alternative) => [alternative.id, alternative]),
+    );
+  }
+
+  private buildAnswerSpace(
+    answerSpaceSize: AnswerSpaceSize | null,
+  ): PdfDocumentNode {
+    const heightBySize: Record<AnswerSpaceSize, number> = {
+      [AnswerSpaceSize.SMALL]: 70,
+      [AnswerSpaceSize.MEDIUM]: 120,
+      [AnswerSpaceSize.LARGE]: 190,
+    };
+
+    return {
+      table: {
+        widths: ['*'],
+        heights: [heightBySize[answerSpaceSize ?? AnswerSpaceSize.MEDIUM]],
+        body: [[{ text: '' }]],
+      },
+      layout: {
+        hLineColor: () => '#aeb9af',
+        vLineColor: () => '#aeb9af',
+      },
+      margin: [0, 8, 0, 0],
+    };
+  }
+
+  private async buildAlternativeNode(
+    alternative: ExamAlternativeForPdf,
+    index: number,
+    columns: 1 | 2,
+    authUser: AuthTokenPayload,
+  ): Promise<PdfDocumentNode> {
+    const optionLetter = String.fromCharCode(65 + index);
+    const content: PdfDocumentNode[] = [];
+
+    if (alternative.type === AlternativeType.IMAGE && alternative.imageFileId) {
+      const imageData = await this.loadPdfImage(
+        alternative.imageFileId,
+        authUser,
+      );
+
+      if (imageData) {
+        content.push({
+          image: imageData,
+          fit: columns === 2 ? [150, 90] : [260, 130],
+          margin: [0, 2, 0, 2],
+        });
+      } else {
+        content.push({
+          text: 'Imagem não incluída no PDF.',
+          italics: true,
+          color: '#6d776d',
+        });
+      }
+    }
+
+    if (alternative.text) {
+      content.unshift({
+        text: alternative.text,
+      });
+    }
+
+    return {
+      columns: [
+        { text: `${optionLetter}.`, width: 18, bold: true },
+        { stack: content.length > 0 ? content : [{ text: '-' }], width: '*' },
+      ],
+      columnGap: 4,
+      margin: [0, 3, 0, 0],
+    };
+  }
+
+  private async buildQuestionNode(
+    question: ExamQuestionForPdf,
+    orderedQuestion: OrderedQuestion,
+    index: number,
+    columns: 1 | 2,
+    authUser: AuthTokenPayload,
+  ): Promise<PdfDocumentNode> {
+    const stack: PdfDocumentNode[] = [
+      {
+        text: [{ text: `${index}. `, bold: true }, { text: question.text }],
+        style: 'questionText',
+      },
+    ];
+
+    for (const questionImage of question.questionImages) {
+      const imageData = await this.loadPdfImage(questionImage.fileId, authUser);
+
+      stack.push(
+        imageData
+          ? {
+              image: imageData,
+              fit: columns === 2 ? [210, 120] : [480, 220],
+              margin: [0, 6, 0, 4],
+            }
+          : {
+              text: 'Imagem da questão não incluída no PDF.',
+              italics: true,
+              color: '#6d776d',
+              margin: [0, 4, 0, 2],
+            },
+      );
+    }
+
+    if (question.type === QuestionType.DISSERTATIVE) {
+      stack.push(this.buildAnswerSpace(question.answerSpaceSize));
+    } else {
+      const alternativeMap = this.buildAlternativeMap(question.alternatives);
+      const orderedAlternatives = orderedQuestion.alternatives
+        .sort((first, second) => first.position - second.position)
+        .map((alternativeOrder) =>
+          alternativeMap.get(alternativeOrder.alternativeId),
+        )
+        .filter((alternative): alternative is ExamAlternativeForPdf =>
+          Boolean(alternative),
+        );
+
+      for (
+        let alternativeIndex = 0;
+        alternativeIndex < orderedAlternatives.length;
+        alternativeIndex += 1
+      ) {
+        stack.push(
+          await this.buildAlternativeNode(
+            orderedAlternatives[alternativeIndex],
+            alternativeIndex,
+            columns,
+            authUser,
+          ),
+        );
+      }
+    }
+
+    return {
+      stack,
+      margin: [0, 0, 0, 10],
+    };
+  }
+
+  private buildQuestionsContent(
+    questionNodes: PdfDocumentNode[],
+    columns: 1 | 2,
+  ): PdfDocumentNode {
+    if (columns === 1) {
+      return { stack: questionNodes };
+    }
+
+    return {
+      columns: [
+        { stack: questionNodes, width: '*' },
+        { text: '', width: '*' },
+      ],
+      columnGap: 18,
+      snakingColumns: true,
+    };
+  }
+
+  private async buildPdfDefinition(
+    examVersion: AccessibleExamVersionForPdf,
+    generatePdfDto: GenerateExamVersionPdfDto,
+    authUser: AuthTokenPayload,
+  ): Promise<Record<string, unknown>> {
+    const orderData = this.parseOrderData(examVersion.orderData);
+    const questionMap = this.buildQuestionMap(examVersion);
+    const questionNodes: PdfDocumentNode[] = [];
+
+    for (let index = 0; index < orderData.questions.length; index += 1) {
+      const orderedQuestion = orderData.questions[index];
+      const question = questionMap.get(orderedQuestion.questionId);
+
+      if (!question) {
+        throw new BadRequestException(
+          `Question ${orderedQuestion.questionId} is not linked to this exam`,
+        );
+      }
+
+      questionNodes.push(
+        await this.buildQuestionNode(
+          question,
+          orderedQuestion,
+          index + 1,
+          generatePdfDto.columns,
+          authUser,
+        ),
+      );
+    }
+
+    return {
+      pageSize: 'A4',
+      pageMargins: [36, 40, 36, 48],
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 9.5,
+        lineHeight: 1.15,
+      },
+      footer: (currentPage: number, pageCount: number) => ({
+        columns: [
+          {
+            text: `Página ${currentPage} de ${pageCount}`,
+            alignment: generatePdfDto.includeVersionInFooter
+              ? 'left'
+              : 'center',
+          },
+          ...(generatePdfDto.includeVersionInFooter
+            ? [
+                {
+                  text: examVersion.name,
+                  alignment: 'right',
+                  fontSize: 7,
+                  color: '#6d776d',
+                },
+              ]
+            : []),
+        ],
+        margin: [36, 0, 36, 18],
+        fontSize: 8,
+        color: '#4f5c52',
+      }),
+      content: [
+        {
+          text: examVersion.exam.name,
+          style: 'examTitle',
+        },
+        {
+          text: examVersion.exam.discipline?.name ?? '',
+          style: 'examSubtitle',
+        },
+        this.buildHeaderTable(generatePdfDto),
+        this.buildQuestionsContent(questionNodes, generatePdfDto.columns),
+      ],
+      styles: {
+        examTitle: {
+          fontSize: 14,
+          bold: true,
+          margin: [0, 0, 0, 3],
+        },
+        examSubtitle: {
+          fontSize: 9,
+          color: '#59665c',
+          margin: [0, 0, 0, 10],
+        },
+        questionText: {
+          fontSize: 9.5,
+          bold: false,
+        },
+      },
+    };
+  }
+
+  private buildPdfFileName(examVersion: AccessibleExamVersionForPdf): string {
+    const safeExamName = examVersion.exam.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    const safeVersionName = examVersion.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+
+    return `${safeExamName || 'prova'}-${safeVersionName || 'versao'}.pdf`;
+  }
+
+  async generatePdf(
+    id: string,
+    generatePdfDto: GenerateExamVersionPdfDto,
+    authUser: AuthTokenPayload,
+  ) {
+    const examVersion = await this.getAccessibleExamVersionForPdf(id, authUser);
+    const docDefinition = await this.buildPdfDefinition(
+      examVersion,
+      generatePdfDto,
+      authUser,
+    );
+    const pdfBuffer = await pdfMake.createPdf(docDefinition).getBuffer();
+    const uploadedPdf = await this.uploadedFilesService.upload(
+      {
+        originalname: this.buildPdfFileName(examVersion),
+        mimetype: 'application/pdf',
+        size: pdfBuffer.length,
+        buffer: pdfBuffer,
+      },
+      authUser,
+    );
+
+    return this.prisma.examVersion.update({
+      where: { id: examVersion.id },
+      data: {
+        pdfUrl: uploadedPdf.contentUrl,
+      },
+    });
   }
 
   findAll(authUser: AuthTokenPayload) {

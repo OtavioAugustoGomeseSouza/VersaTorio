@@ -9,9 +9,8 @@ import {
 } from '@nestjs/common';
 import { ExamVersionsService } from './exam-versions.service';
 import { CreateExamVersionDto } from './dto/create-exam-version.dto';
-import {
-  type AuthenticatedRequest,
-} from '../auth/interfaces/auth-token-payload.interface';
+import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
+import { type AuthenticatedRequest } from '../auth/interfaces/auth-token-payload.interface';
 
 @Controller('exam-versions')
 export class ExamVersionsController {
@@ -42,6 +41,20 @@ export class ExamVersionsController {
   findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;
     return this.examVersionsService.findOne(id, authUser);
+  }
+
+  @Post(':id/generate-pdf')
+  generatePdf(
+    @Param('id') id: string,
+    @Body() generateExamVersionPdfDto: GenerateExamVersionPdfDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
+    return this.examVersionsService.generatePdf(
+      id,
+      generateExamVersionPdfDto,
+      authUser,
+    );
   }
 
   @Delete(':id')
