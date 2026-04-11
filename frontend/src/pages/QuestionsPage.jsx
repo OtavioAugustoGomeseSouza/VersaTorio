@@ -5,6 +5,10 @@ function optionLetter(index) {
   return String.fromCharCode(65 + index);
 }
 
+function createDraftId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function formatQuestionType(type) {
   if (type === 'DISSERTATIVE') {
     return 'Dissertativa';
@@ -33,20 +37,25 @@ function formatAnswerSpaceSize(size) {
   return '-';
 }
 
-function createAlternativeDraft() {
+function createAlternativeDraft(initial = {}) {
   return {
-    id: `alt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    draftId: createDraftId('alt'),
+    existingId: null,
     text: '',
     type: 'TEXT',
     isCorrect: false,
     imageFile: null,
+    existingImageFileId: null,
+    ...initial,
   };
 }
 
-function createQuestionImageDraft() {
+function createQuestionImageDraft(initial = {}) {
   return {
-    id: `qimg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    draftId: createDraftId('qimg'),
     file: null,
+    existingFileId: null,
+    ...initial,
   };
 }
 
@@ -126,6 +135,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     createAlternativeDraft(),
     createAlternativeDraft(),
   ]);
+  const [editingQuestionId, setEditingQuestionId] = useState('');
+  const [initialAlternativeIds, setInitialAlternativeIds] = useState([]);
+  const [deletedAlternativeIds, setDeletedAlternativeIds] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [savingDiscipline, setSavingDiscipline] = useState(false);
@@ -156,6 +168,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
   const topicsFromQuestionDiscipline =
     topicsByDiscipline[questionDisciplineId] ?? [];
+  const isEditingMode = Boolean(editingQuestionId);
 
   const filteredQuestions = useMemo(() => {
     if (!selectedDisciplineFilterId) {
@@ -237,6 +250,18 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setShowTopicModal(true);
   }
 
+  function resetQuestionModalState() {
+    setEditingQuestionId('');
+    setInitialAlternativeIds([]);
+    setDeletedAlternativeIds([]);
+    setQuestionType('MULTIPLE_CHOICE');
+    setQuestionText('');
+    setQuestionAnswerText('');
+    setQuestionAnswerSpaceSize('MEDIUM');
+    setQuestionImageDrafts([]);
+    setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
+  }
+
   function openQuestionModal() {
     if (disciplines.length === 0 || allTopics.length === 0) {
       return;
@@ -252,14 +277,67 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         : fallbackDiscipline?.id ?? disciplines[0].id;
     const initialTopicId = (topicsByDiscipline[initialDisciplineId] ?? [])[0]?.id;
 
+    resetQuestionModalState();
     setQuestionDisciplineId(initialDisciplineId);
     setQuestionTopicId(initialTopicId ?? '');
-    setQuestionType('MULTIPLE_CHOICE');
-    setQuestionText('');
-    setQuestionAnswerText('');
-    setQuestionAnswerSpaceSize('MEDIUM');
-    setQuestionImageDrafts([]);
-    setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
+    setShowQuestionModal(true);
+  }
+
+  function openQuestionModalForEdit(question) {
+    const topic = topicById[question.topicId];
+    const topicDisciplineId = topic?.disciplineId;
+
+    if (!topicDisciplineId) {
+      setMessage('Não foi possível localizar a disciplina da questão');
+      return;
+    }
+
+    const alternativesFromQuestion = (question.alternatives ?? []).map(
+      (alternative) =>
+        createAlternativeDraft({
+          existingId: alternative.id,
+          text: alternative.text ?? '',
+          type: alternative.type,
+          isCorrect: alternative.isCorrect,
+          existingImageFileId: alternative.imageFileId ?? null,
+          imageFile: null,
+        }),
+    );
+
+    const normalizedAlternatives =
+      question.type === 'MULTIPLE_CHOICE'
+        ? alternativesFromQuestion.length >= 2
+          ? alternativesFromQuestion
+          : [
+              ...alternativesFromQuestion,
+              ...Array.from(
+                {
+                  length: 2 - alternativesFromQuestion.length,
+                },
+                () => createAlternativeDraft(),
+              ),
+            ]
+        : [createAlternativeDraft(), createAlternativeDraft()];
+
+    const questionImageDraftsFromQuestion = (question.questionImages ?? []).map(
+      (questionImage) =>
+        createQuestionImageDraft({
+          existingFileId: questionImage.fileId,
+          file: null,
+        }),
+    );
+
+    setEditingQuestionId(question.id);
+    setInitialAlternativeIds((question.alternatives ?? []).map((item) => item.id));
+    setDeletedAlternativeIds([]);
+    setQuestionDisciplineId(topicDisciplineId);
+    setQuestionTopicId(question.topicId);
+    setQuestionType(question.type);
+    setQuestionText(question.text ?? '');
+    setQuestionAnswerText(question.answerText ?? '');
+    setQuestionAnswerSpaceSize(question.answerSpaceSize ?? 'MEDIUM');
+    setQuestionImageDrafts(questionImageDraftsFromQuestion);
+    setQuestionAlternatives(normalizedAlternatives);
     setShowQuestionModal(true);
   }
 
@@ -297,30 +375,44 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
   function removeQuestionImageDraft(imageDraftId) {
     setQuestionImageDrafts((current) =>
-      current.filter((imageDraft) => imageDraft.id !== imageDraftId),
+      current.filter((imageDraft) => imageDraft.draftId !== imageDraftId),
     );
   }
 
   function updateQuestionImageDraft(imageDraftId, changes) {
     setQuestionImageDrafts((current) =>
       current.map((imageDraft) =>
-        imageDraft.id === imageDraftId
+        imageDraft.draftId === imageDraftId
           ? { ...imageDraft, ...changes }
           : imageDraft,
       ),
     );
   }
 
-  function removeAlternativeDraft(alternativeId) {
-    setQuestionAlternatives((current) =>
-      current.filter((alternative) => alternative.id !== alternativeId),
-    );
+  function removeAlternativeDraft(alternativeDraftId) {
+    setQuestionAlternatives((current) => {
+      const alternativeToRemove = current.find(
+        (alternative) => alternative.draftId === alternativeDraftId,
+      );
+
+      if (alternativeToRemove?.existingId) {
+        setDeletedAlternativeIds((existingIds) =>
+          existingIds.includes(alternativeToRemove.existingId)
+            ? existingIds
+            : [...existingIds, alternativeToRemove.existingId],
+        );
+      }
+
+      return current.filter(
+        (alternative) => alternative.draftId !== alternativeDraftId,
+      );
+    });
   }
 
-  function updateAlternativeDraft(alternativeId, changes) {
+  function updateAlternativeDraft(alternativeDraftId, changes) {
     setQuestionAlternatives((current) =>
       current.map((alternative) =>
-        alternative.id === alternativeId
+        alternative.draftId === alternativeDraftId
           ? { ...alternative, ...changes }
           : alternative,
       ),
@@ -414,6 +506,17 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     if (!questionTopicId || !questionText.trim()) {
       return;
     }
+
+    if (isEditingMode) {
+      const shouldSaveChanges = window.confirm(
+        'Deseja realmente salvar as alterações desta questão?',
+      );
+
+      if (!shouldSaveChanges) {
+        return;
+      }
+    }
+
     const isMultipleChoice = questionType === 'MULTIPLE_CHOICE';
     const normalizedAnswerText = questionAnswerText.trim();
 
@@ -432,16 +535,23 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     const alternativesPayload = isMultipleChoice
       ? questionAlternatives
           .map((alternative) => ({
+            draftId: alternative.draftId,
+            existingId: alternative.existingId,
             type: alternative.type,
             isCorrect: alternative.isCorrect,
             text: alternative.text.trim(),
             imageFile: alternative.imageFile,
+            existingImageFileId: alternative.existingImageFileId,
           }))
-          .filter((alternative) =>
-            alternative.type === 'IMAGE'
-              ? Boolean(alternative.imageFile)
-              : alternative.text.length > 0,
-          )
+          .filter((alternative) => {
+            if (alternative.type === 'IMAGE') {
+              return Boolean(
+                alternative.imageFile || alternative.existingImageFileId,
+              );
+            }
+
+            return alternative.text.length > 0;
+          })
       : [];
 
     if (isMultipleChoice && alternativesPayload.length < 2) {
@@ -459,7 +569,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
 
     const invalidImageAlternative = alternativesPayload.find(
-      (alternative) => alternative.type === 'IMAGE' && !alternative.imageFile,
+      (alternative) =>
+        alternative.type === 'IMAGE' &&
+        !alternative.imageFile &&
+        !alternative.existingImageFileId,
     );
 
     if (isMultipleChoice && invalidImageAlternative) {
@@ -470,84 +583,130 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setSavingQuestion(true);
     setMessage('');
 
-    let createdQuestion;
+    let savedQuestionId = editingQuestionId;
     const uploadedFileIds = [];
 
     try {
-      const questionImageUploads = await Promise.all(
-        questionImageDrafts
-          .map((imageDraft) => imageDraft.file)
-          .filter(Boolean)
-          .map((file) =>
-            apiUploadFile('/uploaded-files/upload', {
-              token,
-              file,
+      const questionImageFileIds = [];
+
+      for (const questionImageDraft of questionImageDrafts) {
+        if (questionImageDraft.file) {
+          const uploadedFile = await apiUploadFile('/uploaded-files/upload', {
+            token,
+            file: questionImageDraft.file,
+          });
+
+          uploadedFileIds.push(uploadedFile.id);
+          questionImageFileIds.push(uploadedFile.id);
+          continue;
+        }
+
+        if (questionImageDraft.existingFileId) {
+          questionImageFileIds.push(questionImageDraft.existingFileId);
+        }
+      }
+
+      const questionPayload = {
+        text: questionText.trim(),
+        type: questionType,
+        ...(isMultipleChoice
+          ? {}
+          : {
+              answerText: normalizedAnswerText,
+              answerSpaceSize: questionAnswerSpaceSize,
             }),
-          ),
-      );
+        topicId: questionTopicId,
+        questionImageFileIds,
+      };
 
-      questionImageUploads.forEach((uploadedFile) => {
-        uploadedFileIds.push(uploadedFile.id);
-      });
+      if (isEditingMode) {
+        await apiRequest(`/questions/${editingQuestionId}`, {
+          method: 'PATCH',
+          token,
+          body: questionPayload,
+        });
+      } else {
+        const createdQuestion = await apiRequest('/questions', {
+          method: 'POST',
+          token,
+          body: questionPayload,
+        });
+        savedQuestionId = createdQuestion.id;
+      }
 
-      createdQuestion = await apiRequest('/questions', {
-        method: 'POST',
-        token,
-        body: {
-          text: questionText.trim(),
-          type: questionType,
-          ...(isMultipleChoice
-            ? {}
-            : {
-                answerText: normalizedAnswerText,
-                answerSpaceSize: questionAnswerSpaceSize,
-              }),
-          topicId: questionTopicId,
-          questionImageFileIds: questionImageUploads.map((uploaded) => uploaded.id),
-        },
-      });
+      if (!savedQuestionId) {
+        throw new Error('Question id is required after save');
+      }
 
       if (isMultipleChoice) {
-        const alternativesPayloadWithImageIds = await Promise.all(
-          alternativesPayload.map(async (alternative) => {
-            if (alternative.type !== 'IMAGE') {
-              return {
-                text: alternative.text,
-                type: alternative.type,
-                isCorrect: alternative.isCorrect,
-                imageFileId: undefined,
-              };
-            }
+        const alternativesPayloadWithImageIds = [];
 
+        for (const alternative of alternativesPayload) {
+          let imageFileId = alternative.existingImageFileId;
+
+          if (alternative.imageFile) {
             const uploadedImage = await apiUploadFile('/uploaded-files/upload', {
               token,
               file: alternative.imageFile,
             });
             uploadedFileIds.push(uploadedImage.id);
+            imageFileId = uploadedImage.id;
+          }
 
-            return {
-              text: alternative.text,
-              type: alternative.type,
-              isCorrect: alternative.isCorrect,
-              imageFileId: uploadedImage.id,
-            };
-          }),
-        );
+          alternativesPayloadWithImageIds.push({
+            ...alternative,
+            imageFileId,
+          });
+        }
 
         await Promise.all(
           alternativesPayloadWithImageIds.map((alternative) =>
-            apiRequest('/alternatives', {
-              method: 'POST',
+            alternative.existingId
+              ? apiRequest(`/alternatives/${alternative.existingId}`, {
+                  method: 'PATCH',
+                  token,
+                  body: {
+                    questionId: savedQuestionId,
+                    text: alternative.text,
+                    type: alternative.type,
+                    isCorrect: alternative.isCorrect,
+                    ...(alternative.imageFileId
+                      ? { imageFileId: alternative.imageFileId }
+                      : {}),
+                  },
+                })
+              : apiRequest('/alternatives', {
+                  method: 'POST',
+                  token,
+                  body: {
+                    questionId: savedQuestionId,
+                    text: alternative.text,
+                    type: alternative.type,
+                    isCorrect: alternative.isCorrect,
+                    ...(alternative.imageFileId
+                      ? { imageFileId: alternative.imageFileId }
+                      : {}),
+                  },
+                }),
+          ),
+        );
+
+        if (isEditingMode && deletedAlternativeIds.length > 0) {
+          await Promise.all(
+            deletedAlternativeIds.map((alternativeId) =>
+              apiRequest(`/alternatives/${alternativeId}`, {
+                method: 'DELETE',
+                token,
+              }),
+            ),
+          );
+        }
+      } else if (isEditingMode && initialAlternativeIds.length > 0) {
+        await Promise.all(
+          initialAlternativeIds.map((alternativeId) =>
+            apiRequest(`/alternatives/${alternativeId}`, {
+              method: 'DELETE',
               token,
-              body: {
-                questionId: createdQuestion.id,
-                text: alternative.text,
-                type: alternative.type,
-                isCorrect: alternative.isCorrect,
-                ...(alternative.imageFileId
-                  ? { imageFileId: alternative.imageFileId }
-                  : {}),
-              },
             }),
           ),
         );
@@ -555,15 +714,17 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
       closeAllModals();
       setMessage(
-        isMultipleChoice
-          ? 'Questão e alternativas criadas com sucesso'
-          : 'Questão dissertativa criada com sucesso',
+        isEditingMode
+          ? 'Questão atualizada com sucesso'
+          : isMultipleChoice
+            ? 'Questão e alternativas criadas com sucesso'
+            : 'Questão dissertativa criada com sucesso',
       );
       await loadData();
     } catch (error) {
-      if (createdQuestion?.id) {
+      if (!isEditingMode && savedQuestionId) {
         try {
-          await apiRequest(`/questions/${createdQuestion.id}`, {
+          await apiRequest(`/questions/${savedQuestionId}`, {
             method: 'DELETE',
             token,
           });
@@ -587,7 +748,12 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar questão com alternativas');
+      setMessage(
+        error.message ??
+          (isEditingMode
+            ? 'Erro ao atualizar questão'
+            : 'Erro ao criar questão com alternativas'),
+      );
     } finally {
       setSavingQuestion(false);
     }
@@ -599,7 +765,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         <h1>Banco de questões</h1>
         <p className="muted">
           Clique em uma disciplina para destacar e filtrar as questões pelos
-          tópicos dela.
+          tópicos dela. Clique em uma questão para editar.
         </p>
       </header>
 
@@ -690,9 +856,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 : undefined;
 
               return (
-                <article key={question.id} className="kanban-item">
-                  <h3>{formatQuestionType(question.type)}</h3>
-                  <p>{question.text}</p>
+                <article
+                  key={question.id}
+                  className="kanban-item question-card"
+                  onClick={() => openQuestionModalForEdit(question)}
+                >
+                  <p className="question-main-text">{question.text}</p>
+                  <p className="question-meta-type">{formatQuestionType(question.type)}</p>
 
                   {(question.questionImages ?? []).length > 0 ? (
                     <div className="question-images-grid">
@@ -849,7 +1019,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         <div className="modal-overlay" onClick={closeAllModals}>
           <section className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Nova questão</h2>
+              <h2>{isEditingMode ? 'Editar questão' : 'Nova questão'}</h2>
               <button type="button" className="ghost-btn" onClick={closeAllModals}>
                 Fechar
               </button>
@@ -913,14 +1083,14 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 <legend>Imagens da questão</legend>
                 <div className="form-grid">
                   {questionImageDrafts.map((questionImage, index) => (
-                    <div key={questionImage.id} className="upload-row">
+                    <div key={questionImage.draftId} className="upload-row">
                       <label className="form-grid">
                         <span>Imagem {index + 1}</span>
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           onChange={(event) =>
-                            updateQuestionImageDraft(questionImage.id, {
+                            updateQuestionImageDraft(questionImage.draftId, {
                               file: event.target.files?.[0] ?? null,
                             })
                           }
@@ -934,7 +1104,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                       <button
                         type="button"
                         className="ghost-btn"
-                        onClick={() => removeQuestionImageDraft(questionImage.id)}
+                        onClick={() => removeQuestionImageDraft(questionImage.draftId)}
                       >
                         Remover
                       </button>
@@ -961,7 +1131,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                   />
 
                   <label htmlFor="modal-question-answer-space-size">
-                    Tamanho do espaco para resposta
+                    Tamanho do espaço para resposta
                   </label>
                   <select
                     id="modal-question-answer-space-size"
@@ -978,7 +1148,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                   <legend>Alternativas</legend>
                   <div className="form-grid">
                     {questionAlternatives.map((alternative, index) => (
-                      <div key={alternative.id} className="alt-row">
+                      <div key={alternative.draftId} className="alt-row">
                         {alternative.type === 'TEXT' ? (
                           <label className="form-grid">
                             <span>Texto da alternativa {optionLetter(index)}</span>
@@ -986,7 +1156,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                               type="text"
                               value={alternative.text}
                               onChange={(event) =>
-                                updateAlternativeDraft(alternative.id, {
+                                updateAlternativeDraft(alternative.draftId, {
                                   text: event.target.value,
                                 })
                               }
@@ -1000,7 +1170,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                               type="file"
                               accept="image/png,image/jpeg,image/webp"
                               onChange={(event) =>
-                                updateAlternativeDraft(alternative.id, {
+                                updateAlternativeDraft(alternative.draftId, {
                                   imageFile: event.target.files?.[0] ?? null,
                                 })
                               }
@@ -1019,10 +1189,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                             value={alternative.type}
                             onChange={(event) => {
                               const nextType = event.target.value;
-                              updateAlternativeDraft(alternative.id, {
+                              updateAlternativeDraft(alternative.draftId, {
                                 type: nextType,
                                 ...(nextType === 'TEXT'
-                                  ? { imageFile: null }
+                                  ? { imageFile: null, existingImageFileId: null }
                                   : {}),
                               });
                             }}
@@ -1037,7 +1207,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                             type="checkbox"
                             checked={alternative.isCorrect}
                             onChange={(event) =>
-                              updateAlternativeDraft(alternative.id, {
+                              updateAlternativeDraft(alternative.draftId, {
                                 isCorrect: event.target.checked,
                               })
                             }
@@ -1048,7 +1218,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                         <button
                           type="button"
                           className="ghost-btn"
-                          onClick={() => removeAlternativeDraft(alternative.id)}
+                          onClick={() => removeAlternativeDraft(alternative.draftId)}
                           disabled={questionAlternatives.length <= 2}
                         >
                           Remover
@@ -1071,7 +1241,11 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 type="submit"
                 disabled={savingQuestion || !questionTopicId}
               >
-                {savingQuestion ? 'Salvando...' : 'Criar questão'}
+                {savingQuestion
+                  ? 'Salvando...'
+                  : isEditingMode
+                    ? 'Salvar'
+                    : 'Criar questão'}
               </button>
             </form>
           </section>

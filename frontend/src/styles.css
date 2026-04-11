@@ -391,6 +391,34 @@ legend {
   gap: 0.45rem;
 }
 
+.question-card {
+  cursor: pointer;
+}
+
+.question-card:hover {
+  border-color: #9ecfa8;
+}
+
+.question-main-text {
+  margin: 0;
+  font-size: 1.03rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #142417;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.question-meta-type {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: #5d7163;
+}
+
 .icon-btn {
   width: 34px;
   height: 34px;
