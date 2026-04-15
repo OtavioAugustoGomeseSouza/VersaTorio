@@ -30,11 +30,14 @@ services:
       NODE_ENV: development
       PORT: 3000
       DATABASE_URL: "mysql://tcc:tcc@mysql:3306/tcc"
+      UPLOAD_ROOT_DIR: "/app/uploads"
+      UPLOAD_MAX_FILE_SIZE_BYTES: "20971520"
     ports:
       - "3001:3000"
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - backend_uploads:/app/uploads
     command: >
       sh -c "
       npm ci &&
@@ -64,3 +67,4 @@ services:
 
 volumes:
   mysql_data:
+  backend_uploads:

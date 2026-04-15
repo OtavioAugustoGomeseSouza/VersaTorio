@@ -15,7 +15,19 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadedFileEntity } from './entities/uploaded-file.entity';
 
-export const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const DEFAULT_MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
+function resolveMaxUploadFileSizeBytes(): number {
+  const configuredValue = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES);
+
+  if (Number.isInteger(configuredValue) && configuredValue > 0) {
+    return configuredValue;
+  }
+
+  return DEFAULT_MAX_UPLOAD_FILE_SIZE_BYTES;
+}
+
+export const MAX_UPLOAD_FILE_SIZE_BYTES = resolveMaxUploadFileSizeBytes();
 
 export type UploadedMulterFile = {
   originalname: string;
@@ -51,7 +63,9 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
 
 @Injectable()
 export class UploadedFilesService {
-  private readonly uploadRootDir = resolve(__dirname, '..', '..', 'uploads');
+  private readonly uploadRootDir = process.env.UPLOAD_ROOT_DIR
+    ? resolve(process.env.UPLOAD_ROOT_DIR)
+    : resolve(__dirname, '..', '..', 'uploads');
 
   constructor(private prisma: PrismaService) {}
 
@@ -59,7 +73,9 @@ export class UploadedFilesService {
     return authUser.role === UserRole.admin;
   }
 
-  private buildAccessFilter(authUser: AuthTokenPayload): Prisma.UploadedFileWhereInput {
+  private buildAccessFilter(
+    authUser: AuthTokenPayload,
+  ): Prisma.UploadedFileWhereInput {
     return this.isAdmin(authUser) ? {} : { userId: authUser.id };
   }
 
@@ -75,7 +91,9 @@ export class UploadedFilesService {
     });
   }
 
-  private ensureFileIsValid(file: UploadedMulterFile | undefined): asserts file is UploadedMulterFile {
+  private ensureFileIsValid(
+    file: UploadedMulterFile | undefined,
+  ): asserts file is UploadedMulterFile {
     if (!file) {
       throw new BadRequestException('File is required');
     }
@@ -193,7 +211,9 @@ export class UploadedFilesService {
     try {
       await access(absolutePath);
     } catch {
-      throw new NotFoundException(`Uploaded file content with ID ${id} not found`);
+      throw new NotFoundException(
+        `Uploaded file content with ID ${id} not found`,
+      );
     }
 
     return {

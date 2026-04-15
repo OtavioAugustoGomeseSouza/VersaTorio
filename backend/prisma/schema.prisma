@@ -122,6 +122,8 @@ model ExamVersion {
   exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
   orderData Json // Armazena a estrutura embaralhada: { questions: [{ id, alternatives: [id, id] }] }
   pdfUrl    String?
+  answerKeyJson Json?
+  answerKeyUrl String?
   createdAt DateTime @default(now())
 }
 

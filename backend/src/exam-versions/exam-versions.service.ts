@@ -50,6 +50,23 @@ type ExamQuestionForPdf =
   AccessibleExamVersionForPdf['exam']['examQuestions'][number]['question'];
 type ExamAlternativeForPdf = ExamQuestionForPdf['alternatives'][number];
 type OrderedQuestion = ExamVersionOrderData['questions'][number];
+type AnswerKeyJson = {
+  version: string;
+  exam: string;
+  discipline: string | null;
+  answers: Array<{
+    questionNumber: number;
+    questionId: string;
+    type: QuestionType;
+    correctOptions?: string[];
+    alternatives?: Array<{
+      option: string;
+      alternativeId: string;
+      isCorrect: boolean;
+    }>;
+    expectedAnswer?: string;
+  }>;
+};
 
 @Injectable()
 export class ExamVersionsService {
@@ -428,17 +445,35 @@ export class ExamVersionsService {
     fileId: string,
     authUser: AuthTokenPayload,
   ): Promise<string | null> {
-    const content = await this.uploadedFilesService.getContentData(
-      fileId,
-      authUser,
-    );
+    let content: Awaited<ReturnType<UploadedFilesService['getContentData']>>;
+
+    try {
+      content = await this.uploadedFilesService.getContentData(
+        fileId,
+        authUser,
+      );
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return null;
+      }
+
+      throw error;
+    }
 
     if (!['image/png', 'image/jpeg'].includes(content.mimeType)) {
       return null;
     }
 
-    const imageBuffer = await readFile(content.absolutePath);
-    return `data:${content.mimeType};base64,${imageBuffer.toString('base64')}`;
+    try {
+      const imageBuffer = await readFile(content.absolutePath);
+      return `data:${content.mimeType};base64,${imageBuffer.toString('base64')}`;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   private buildAlternativeMap(
@@ -447,6 +482,22 @@ export class ExamVersionsService {
     return new Map(
       alternatives.map((alternative) => [alternative.id, alternative]),
     );
+  }
+
+  private getOrderedAlternatives(
+    question: ExamQuestionForPdf,
+    orderedQuestion: OrderedQuestion,
+  ): ExamAlternativeForPdf[] {
+    const alternativeMap = this.buildAlternativeMap(question.alternatives);
+
+    return [...orderedQuestion.alternatives]
+      .sort((first, second) => first.position - second.position)
+      .map((alternativeOrder) =>
+        alternativeMap.get(alternativeOrder.alternativeId),
+      )
+      .filter((alternative): alternative is ExamAlternativeForPdf =>
+        Boolean(alternative),
+      );
   }
 
   private buildAnswerSpace(
@@ -554,15 +605,10 @@ export class ExamVersionsService {
     if (question.type === QuestionType.DISSERTATIVE) {
       stack.push(this.buildAnswerSpace(question.answerSpaceSize));
     } else {
-      const alternativeMap = this.buildAlternativeMap(question.alternatives);
-      const orderedAlternatives = orderedQuestion.alternatives
-        .sort((first, second) => first.position - second.position)
-        .map((alternativeOrder) =>
-          alternativeMap.get(alternativeOrder.alternativeId),
-        )
-        .filter((alternative): alternative is ExamAlternativeForPdf =>
-          Boolean(alternative),
-        );
+      const orderedAlternatives = this.getOrderedAlternatives(
+        question,
+        orderedQuestion,
+      );
 
       for (
         let alternativeIndex = 0;
@@ -696,6 +742,258 @@ export class ExamVersionsService {
     };
   }
 
+  private buildAnswerKeyJson(
+    examVersion: AccessibleExamVersionForPdf,
+  ): AnswerKeyJson {
+    const orderData = this.parseOrderData(examVersion.orderData);
+    const questionMap = this.buildQuestionMap(examVersion);
+
+    return {
+      version: examVersion.name,
+      exam: examVersion.exam.name,
+      discipline: examVersion.exam.discipline?.name ?? null,
+      answers: orderData.questions.map((orderedQuestion, index) => {
+        const question = questionMap.get(orderedQuestion.questionId);
+
+        if (!question) {
+          throw new BadRequestException(
+            `Question ${orderedQuestion.questionId} is not linked to this exam`,
+          );
+        }
+
+        if (question.type === QuestionType.DISSERTATIVE) {
+          return {
+            questionNumber: index + 1,
+            questionId: question.id,
+            type: question.type,
+            expectedAnswer: question.answerText ?? '',
+          };
+        }
+
+        const orderedAlternatives = this.getOrderedAlternatives(
+          question,
+          orderedQuestion,
+        );
+        const alternatives = orderedAlternatives.map(
+          (alternative, alternativeIndex) => ({
+            option: String.fromCharCode(65 + alternativeIndex),
+            alternativeId: alternative.id,
+            isCorrect: alternative.isCorrect,
+          }),
+        );
+
+        return {
+          questionNumber: index + 1,
+          questionId: question.id,
+          type: question.type,
+          correctOptions: alternatives
+            .filter((alternative) => alternative.isCorrect)
+            .map((alternative) => alternative.option),
+          alternatives,
+        };
+      }),
+    };
+  }
+
+  private async buildAnswerKeyAlternativeNode(
+    alternative: ExamAlternativeForPdf,
+    index: number,
+    authUser: AuthTokenPayload,
+  ): Promise<PdfDocumentNode> {
+    const optionLetter = String.fromCharCode(65 + index);
+    const isCorrect = alternative.isCorrect;
+    const content: PdfDocumentNode[] = [];
+
+    if (alternative.type === AlternativeType.IMAGE && alternative.imageFileId) {
+      const imageData = await this.loadPdfImage(
+        alternative.imageFileId,
+        authUser,
+      );
+
+      if (imageData) {
+        content.push({
+          image: imageData,
+          fit: [180, 95],
+          margin: [0, 3, 0, 2],
+        });
+      } else {
+        content.push({
+          text: 'Imagem não incluída no PDF.',
+          italics: true,
+          color: '#6d776d',
+        });
+      }
+    }
+
+    if (alternative.text) {
+      content.unshift({ text: alternative.text });
+    }
+
+    return {
+      columns: [
+        {
+          text: `${isCorrect ? '[X]' : '[ ]'} ${optionLetter}.`,
+          width: 42,
+          bold: true,
+          color: isCorrect ? '#116042' : '#4f5c52',
+        },
+        {
+          stack: content.length > 0 ? content : [{ text: '-' }],
+          width: '*',
+          color: isCorrect ? '#116042' : '#142218',
+          bold: isCorrect,
+        },
+      ],
+      columnGap: 6,
+      margin: [0, 3, 0, 0],
+    };
+  }
+
+  private async buildAnswerKeyQuestionNode(
+    question: ExamQuestionForPdf,
+    orderedQuestion: OrderedQuestion,
+    index: number,
+    authUser: AuthTokenPayload,
+  ): Promise<PdfDocumentNode> {
+    const stack: PdfDocumentNode[] = [
+      {
+        text: [{ text: `${index}. `, bold: true }, { text: question.text }],
+        style: 'questionText',
+      },
+    ];
+
+    for (const questionImage of question.questionImages) {
+      const imageData = await this.loadPdfImage(questionImage.fileId, authUser);
+
+      stack.push(
+        imageData
+          ? {
+              image: imageData,
+              fit: [480, 210],
+              margin: [0, 6, 0, 4],
+            }
+          : {
+              text: 'Imagem da questão não incluída no PDF.',
+              italics: true,
+              color: '#6d776d',
+              margin: [0, 4, 0, 2],
+            },
+      );
+    }
+
+    if (question.type === QuestionType.DISSERTATIVE) {
+      stack.push({
+        text: [
+          { text: 'Resposta esperada: ', bold: true },
+          question.answerText ?? '-',
+        ],
+        margin: [0, 5, 0, 0],
+      });
+    } else {
+      const orderedAlternatives = this.getOrderedAlternatives(
+        question,
+        orderedQuestion,
+      );
+
+      for (
+        let alternativeIndex = 0;
+        alternativeIndex < orderedAlternatives.length;
+        alternativeIndex += 1
+      ) {
+        stack.push(
+          await this.buildAnswerKeyAlternativeNode(
+            orderedAlternatives[alternativeIndex],
+            alternativeIndex,
+            authUser,
+          ),
+        );
+      }
+    }
+
+    return {
+      stack,
+      margin: [0, 0, 0, 12],
+    };
+  }
+
+  private async buildAnswerKeyPdfDefinition(
+    examVersion: AccessibleExamVersionForPdf,
+    authUser: AuthTokenPayload,
+  ): Promise<Record<string, unknown>> {
+    const orderData = this.parseOrderData(examVersion.orderData);
+    const questionMap = this.buildQuestionMap(examVersion);
+    const questionNodes: PdfDocumentNode[] = [];
+
+    for (let index = 0; index < orderData.questions.length; index += 1) {
+      const orderedQuestion = orderData.questions[index];
+      const question = questionMap.get(orderedQuestion.questionId);
+
+      if (!question) {
+        throw new BadRequestException(
+          `Question ${orderedQuestion.questionId} is not linked to this exam`,
+        );
+      }
+
+      questionNodes.push(
+        await this.buildAnswerKeyQuestionNode(
+          question,
+          orderedQuestion,
+          index + 1,
+          authUser,
+        ),
+      );
+    }
+
+    return {
+      pageSize: 'A4',
+      pageMargins: [36, 40, 36, 48],
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 9.5,
+        lineHeight: 1.15,
+      },
+      footer: (currentPage: number, pageCount: number) => ({
+        text: `Página ${currentPage} de ${pageCount}`,
+        alignment: 'center',
+        margin: [36, 0, 36, 18],
+        fontSize: 8,
+        color: '#4f5c52',
+      }),
+      content: [
+        {
+          text: `Gabarito - ${examVersion.exam.name}`,
+          style: 'examTitle',
+        },
+        {
+          text: `${examVersion.exam.discipline?.name ?? ''} | ${examVersion.name}`,
+          style: 'examSubtitle',
+        },
+        {
+          text: 'Alternativas corretas estão marcadas com [X].',
+          margin: [0, 0, 0, 10],
+          color: '#4f5c52',
+        },
+        { stack: questionNodes },
+      ],
+      styles: {
+        examTitle: {
+          fontSize: 14,
+          bold: true,
+          margin: [0, 0, 0, 3],
+        },
+        examSubtitle: {
+          fontSize: 9,
+          color: '#59665c',
+          margin: [0, 0, 0, 10],
+        },
+        questionText: {
+          fontSize: 9.5,
+          bold: false,
+        },
+      },
+    };
+  }
+
   private buildPdfFileName(examVersion: AccessibleExamVersionForPdf): string {
     const safeExamName = examVersion.exam.name
       .normalize('NFD')
@@ -711,6 +1009,15 @@ export class ExamVersionsService {
       .toLowerCase();
 
     return `${safeExamName || 'prova'}-${safeVersionName || 'versao'}.pdf`;
+  }
+
+  private buildAnswerKeyFileName(
+    examVersion: AccessibleExamVersionForPdf,
+  ): string {
+    return this.buildPdfFileName(examVersion).replace(
+      /\.pdf$/,
+      '-gabarito.pdf',
+    );
   }
 
   async generatePdf(
@@ -739,6 +1046,33 @@ export class ExamVersionsService {
       where: { id: examVersion.id },
       data: {
         pdfUrl: uploadedPdf.contentUrl,
+      },
+    });
+  }
+
+  async generateAnswerKey(id: string, authUser: AuthTokenPayload) {
+    const examVersion = await this.getAccessibleExamVersionForPdf(id, authUser);
+    const answerKeyJson = this.buildAnswerKeyJson(examVersion);
+    const docDefinition = await this.buildAnswerKeyPdfDefinition(
+      examVersion,
+      authUser,
+    );
+    const pdfBuffer = await pdfMake.createPdf(docDefinition).getBuffer();
+    const uploadedAnswerKey = await this.uploadedFilesService.upload(
+      {
+        originalname: this.buildAnswerKeyFileName(examVersion),
+        mimetype: 'application/pdf',
+        size: pdfBuffer.length,
+        buffer: pdfBuffer,
+      },
+      authUser,
+    );
+
+    return this.prisma.examVersion.update({
+      where: { id: examVersion.id },
+      data: {
+        answerKeyJson: answerKeyJson as unknown as Prisma.InputJsonValue,
+        answerKeyUrl: uploadedAnswerKey.contentUrl,
       },
     });
   }

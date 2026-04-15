@@ -23,6 +23,10 @@ function buildPdfFileName(version, exam) {
   return `${baseName || 'prova'}.pdf`;
 }
 
+function buildAnswerKeyFileName(version, exam) {
+  return buildPdfFileName(version, exam).replace(/\.pdf$/, '-gabarito.pdf');
+}
+
 function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewError, setPreviewError] = useState('');
@@ -98,7 +102,9 @@ function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
     return null;
   }
 
-  return <iframe className="pdf-preview-frame" src={previewUrl} title={title} />;
+  return (
+    <iframe className="pdf-preview-frame" src={previewUrl} title={title} />
+  );
 }
 
 export default function VersionsPage({ token, onUnauthorized }) {
@@ -113,6 +119,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
   const [pdfColumns, setPdfColumns] = useState(2);
   const [includeVersionInFooter, setIncludeVersionInFooter] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingAnswerKeyId, setGeneratingAnswerKeyId] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -264,8 +271,8 @@ export default function VersionsPage({ token, onUnauthorized }) {
     );
   }
 
-  async function downloadPdf(version, pdfUrl) {
-    const response = await fetch(`${API_URL}${pdfUrl}`, {
+  async function downloadAuthenticatedFile(url, fileName) {
+    const response = await fetch(`${API_URL}${url}`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -277,18 +284,32 @@ export default function VersionsPage({ token, onUnauthorized }) {
     }
 
     if (!response.ok) {
-      throw new Error(`Erro ao baixar PDF (${response.status})`);
+      throw new Error(`Erro ao baixar arquivo (${response.status})`);
     }
 
-    const pdfBlob = await response.blob();
-    const objectUrl = URL.createObjectURL(pdfBlob);
+    const fileBlob = await response.blob();
+    const objectUrl = URL.createObjectURL(fileBlob);
     const link = document.createElement('a');
     link.href = objectUrl;
-    link.download = buildPdfFileName(version, examById[version.examId]);
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
+  async function downloadPdf(version, pdfUrl) {
+    await downloadAuthenticatedFile(
+      pdfUrl,
+      buildPdfFileName(version, examById[version.examId]),
+    );
+  }
+
+  async function downloadAnswerKey(version, answerKeyUrl) {
+    await downloadAuthenticatedFile(
+      answerKeyUrl,
+      buildAnswerKeyFileName(version, examById[version.examId]),
+    );
   }
 
   async function handleDownloadExistingPdf(version) {
@@ -302,6 +323,20 @@ export default function VersionsPage({ token, onUnauthorized }) {
       await downloadPdf(version, version.pdfUrl);
     } catch (error) {
       setMessage(error.message ?? 'Erro ao baixar PDF');
+    }
+  }
+
+  async function handleDownloadExistingAnswerKey(version) {
+    if (!version.answerKeyUrl) {
+      return;
+    }
+
+    setMessage('');
+
+    try {
+      await downloadAnswerKey(version, version.answerKeyUrl);
+    } catch (error) {
+      setMessage(error.message ?? 'Erro ao baixar gabarito');
     }
   }
 
@@ -361,6 +396,43 @@ export default function VersionsPage({ token, onUnauthorized }) {
       setMessage(error.message ?? 'Erro ao gerar PDF');
     } finally {
       setGeneratingPdf(false);
+    }
+  }
+
+  async function handleGenerateAnswerKey(version) {
+    setGeneratingAnswerKeyId(version.id);
+    setMessage('');
+
+    try {
+      const updatedVersion = await apiRequest(
+        `/exam-versions/${version.id}/generate-answer-key`,
+        {
+          method: 'POST',
+          token,
+        },
+      );
+
+      setVersions((currentVersions) =>
+        currentVersions.map((currentVersion) =>
+          currentVersion.id === updatedVersion.id
+            ? updatedVersion
+            : currentVersion,
+        ),
+      );
+      setSelectedVersionId(updatedVersion.id);
+      setMessage('Gabarito gerado');
+
+      if (updatedVersion.answerKeyUrl) {
+        await downloadAnswerKey(updatedVersion, updatedVersion.answerKeyUrl);
+      }
+    } catch (error) {
+      if (error.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      setMessage(error.message ?? 'Erro ao gerar gabarito');
+    } finally {
+      setGeneratingAnswerKeyId('');
     }
   }
 
@@ -485,6 +557,16 @@ export default function VersionsPage({ token, onUnauthorized }) {
                       >
                         Gerar PDF
                       </button>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => handleGenerateAnswerKey(version)}
+                        disabled={generatingAnswerKeyId === version.id}
+                      >
+                        {generatingAnswerKeyId === version.id
+                          ? 'Gerando...'
+                          : 'Gerar gabarito'}
+                      </button>
                       {version.pdfUrl ? (
                         <button
                           type="button"
@@ -492,6 +574,17 @@ export default function VersionsPage({ token, onUnauthorized }) {
                           onClick={() => handleDownloadExistingPdf(version)}
                         >
                           Baixar PDF
+                        </button>
+                      ) : null}
+                      {version.answerKeyUrl ? (
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() =>
+                            handleDownloadExistingAnswerKey(version)
+                          }
+                        >
+                          Baixar gabarito
                         </button>
                       ) : null}
                       <button
@@ -520,6 +613,16 @@ export default function VersionsPage({ token, onUnauthorized }) {
             <button type="button" onClick={() => openPdfModal(selectedVersion)}>
               Gerar PDF
             </button>
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => handleGenerateAnswerKey(selectedVersion)}
+              disabled={generatingAnswerKeyId === selectedVersion.id}
+            >
+              {generatingAnswerKeyId === selectedVersion.id
+                ? 'Gerando...'
+                : 'Gerar gabarito'}
+            </button>
             {selectedVersion.pdfUrl ? (
               <button
                 type="button"
@@ -527,6 +630,15 @@ export default function VersionsPage({ token, onUnauthorized }) {
                 onClick={() => handleDownloadExistingPdf(selectedVersion)}
               >
                 Baixar PDF
+              </button>
+            ) : null}
+            {selectedVersion.answerKeyUrl ? (
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => handleDownloadExistingAnswerKey(selectedVersion)}
+              >
+                Baixar gabarito
               </button>
             ) : null}
           </div>

@@ -57,6 +57,15 @@ export class ExamVersionsController {
     );
   }
 
+  @Post(':id/generate-answer-key')
+  generateAnswerKey(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authUser = request.user;
+    return this.examVersionsService.generateAnswerKey(id, authUser);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     const authUser = request.user;

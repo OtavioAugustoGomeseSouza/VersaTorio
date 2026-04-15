@@ -4,5 +4,7 @@ export class ExamVersionEntity {
   examId: string;
   orderData: any;
   pdfUrl?: string;
+  answerKeyJson?: any;
+  answerKeyUrl?: string;
   createdAt: Date;
 }
