@@ -420,7 +420,7 @@ export class ExamVersionsService {
           return {
             text: [
               { text: `${field.label}: `, bold: true },
-              field.value || '______________________________',
+              field.value,
             ],
             margin: [6, 6, 6, 6],
           };
@@ -438,6 +438,16 @@ export class ExamVersionsService {
         vLineColor: () => '#cbd5cc',
       },
       margin: [0, 0, 0, 12],
+    };
+  }
+
+  private buildExamHeaderContent(examVersion: AccessibleExamVersionForPdf): {
+    title: string;
+    subtitle: string;
+  } {
+    return {
+      title: examVersion.exam.discipline?.name?.trim() || 'Disciplina sem nome',
+      subtitle: examVersion.exam.name,
     };
   }
 
@@ -655,6 +665,7 @@ export class ExamVersionsService {
     generatePdfDto: GenerateExamVersionPdfDto,
     authUser: AuthTokenPayload,
   ): Promise<Record<string, unknown>> {
+    const headerContent = this.buildExamHeaderContent(examVersion);
     const orderData = this.parseOrderData(examVersion.orderData);
     const questionMap = this.buildQuestionMap(examVersion);
     const questionNodes: PdfDocumentNode[] = [];
@@ -713,11 +724,11 @@ export class ExamVersionsService {
       }),
       content: [
         {
-          text: examVersion.exam.name,
+          text: headerContent.title,
           style: 'examTitle',
         },
         {
-          text: examVersion.exam.discipline?.name ?? '',
+          text: headerContent.subtitle,
           style: 'examSubtitle',
         },
         this.buildHeaderTable(generatePdfDto),
@@ -920,6 +931,7 @@ export class ExamVersionsService {
     examVersion: AccessibleExamVersionForPdf,
     authUser: AuthTokenPayload,
   ): Promise<Record<string, unknown>> {
+    const headerContent = this.buildExamHeaderContent(examVersion);
     const orderData = this.parseOrderData(examVersion.orderData);
     const questionMap = this.buildQuestionMap(examVersion);
     const questionNodes: PdfDocumentNode[] = [];
@@ -961,11 +973,11 @@ export class ExamVersionsService {
       }),
       content: [
         {
-          text: `Gabarito - ${examVersion.exam.name}`,
+          text: headerContent.title,
           style: 'examTitle',
         },
         {
-          text: `${examVersion.exam.discipline?.name ?? ''} | ${examVersion.name}`,
+          text: `Gabarito - ${headerContent.subtitle} | ${examVersion.name}`,
           style: 'examSubtitle',
         },
         {
