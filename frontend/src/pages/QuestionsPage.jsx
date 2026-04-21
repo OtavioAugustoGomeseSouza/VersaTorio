@@ -108,6 +108,22 @@ function AuthenticatedImage({ token, fileId, alt, className }) {
   return <img src={imageSrc} alt={alt} className={className} />;
 }
 
+function TrashIcon({ className = '' }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      focusable="false"
+    >
+      <path
+        d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v8h-2V9zm4 0h2v8h-2V9zM7 9h2v8H7V9zm1 12a2 2 0 0 1-2-2V8h12v11a2 2 0 0 1-2 2H8z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export default function QuestionsPage({ token, onUnauthorized }) {
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
@@ -143,6 +159,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [savingDiscipline, setSavingDiscipline] = useState(false);
   const [savingTopic, setSavingTopic] = useState(false);
   const [savingQuestion, setSavingQuestion] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState('');
   const [message, setMessage] = useState('');
 
   const allTopics = useMemo(
@@ -759,6 +776,43 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
   }
 
+  async function handleDeleteQuestion(question) {
+    const confirmed = window.confirm(
+      'Deseja realmente excluir esta questão? As alternativas, imagens e referências em provas e versões também serão removidas.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingQuestionId(question.id);
+    setMessage('');
+
+    try {
+      await apiRequest(`/questions/${question.id}`, {
+        method: 'DELETE',
+        token,
+      });
+
+      if (editingQuestionId === question.id) {
+        closeAllModals();
+        resetQuestionModalState();
+      }
+
+      setMessage('Questão excluída com sucesso');
+      await loadData();
+    } catch (error) {
+      if (error.status === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      setMessage(error.message ?? 'Erro ao excluir questão');
+    } finally {
+      setDeletingQuestionId('');
+    }
+  }
+
   return (
     <div className="page-grid">
       <header>
@@ -861,7 +915,26 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                   className="kanban-item question-card"
                   onClick={() => openQuestionModalForEdit(question)}
                 >
-                  <p className="question-main-text">{question.text}</p>
+                  <div className="question-card-header">
+                    <p className="question-main-text">{question.text}</p>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-small danger-btn"
+                      title="Excluir questão"
+                      aria-label="Excluir questão"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteQuestion(question);
+                      }}
+                      disabled={deletingQuestionId === question.id}
+                    >
+                      {deletingQuestionId === question.id ? (
+                        '...'
+                      ) : (
+                        <TrashIcon className="button-icon" />
+                      )}
+                    </button>
+                  </div>
                   <p className="question-meta-type">{formatQuestionType(question.type)}</p>
 
                   {(question.questionImages ?? []).length > 0 ? (

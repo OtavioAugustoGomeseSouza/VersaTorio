@@ -404,6 +404,13 @@ legend {
   border-color: #9ecfa8;
 }
 
+.question-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .question-main-text {
   margin: 0;
   font-size: 1.03rem;
@@ -439,6 +446,11 @@ legend {
   width: 28px;
   height: 28px;
   font-size: 1rem;
+}
+
+.button-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .discipline-item-header {

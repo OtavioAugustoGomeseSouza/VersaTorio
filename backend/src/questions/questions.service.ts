@@ -13,10 +13,25 @@ import {
   AuthTokenPayload,
   UserRole,
 } from '../auth/interfaces/auth-token-payload.interface';
+import { UploadedFilesService } from '../uploaded-files/uploaded-files.service';
+
+type ExamVersionOrderData = {
+  questions: Array<{
+    questionId: string;
+    position: number;
+    alternatives: Array<{
+      alternativeId: string;
+      position: number;
+    }>;
+  }>;
+};
 
 @Injectable()
 export class QuestionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly uploadedFilesService: UploadedFilesService,
+  ) {}
 
   private readonly questionWithAssetsInclude = {
     alternatives: true,
@@ -108,6 +123,191 @@ export class QuestionsService {
       fileId,
       position: index + 1,
     }));
+  }
+
+  private parseExamVersionOrderData(
+    orderData: Prisma.JsonValue,
+  ): ExamVersionOrderData {
+    if (
+      !orderData ||
+      typeof orderData !== 'object' ||
+      Array.isArray(orderData) ||
+      !Array.isArray((orderData as { questions?: unknown }).questions)
+    ) {
+      throw new BadRequestException('Exam version orderData is invalid');
+    }
+
+    const questions = (orderData as { questions: unknown[] }).questions.map(
+      (question) => {
+        if (
+          !question ||
+          typeof question !== 'object' ||
+          Array.isArray(question)
+        ) {
+          throw new BadRequestException(
+            'Exam version question order is invalid',
+          );
+        }
+
+        const parsedQuestion = question as {
+          questionId?: unknown;
+          position?: unknown;
+          alternatives?: unknown;
+        };
+
+        if (
+          typeof parsedQuestion.questionId !== 'string' ||
+          typeof parsedQuestion.position !== 'number' ||
+          !Array.isArray(parsedQuestion.alternatives)
+        ) {
+          throw new BadRequestException(
+            'Exam version question order is invalid',
+          );
+        }
+
+        const alternatives = parsedQuestion.alternatives.map((alternative) => {
+          if (
+            !alternative ||
+            typeof alternative !== 'object' ||
+            Array.isArray(alternative)
+          ) {
+            throw new BadRequestException(
+              'Exam version alternative order is invalid',
+            );
+          }
+
+          const parsedAlternative = alternative as {
+            alternativeId?: unknown;
+            position?: unknown;
+          };
+
+          if (
+            typeof parsedAlternative.alternativeId !== 'string' ||
+            typeof parsedAlternative.position !== 'number'
+          ) {
+            throw new BadRequestException(
+              'Exam version alternative order is invalid',
+            );
+          }
+
+          return {
+            alternativeId: parsedAlternative.alternativeId,
+            position: parsedAlternative.position,
+          };
+        });
+
+        return {
+          questionId: parsedQuestion.questionId,
+          position: parsedQuestion.position,
+          alternatives,
+        };
+      },
+    );
+
+    return {
+      questions: questions.sort(
+        (first, second) => first.position - second.position,
+      ),
+    };
+  }
+
+  private removeQuestionFromOrderData(
+    orderData: Prisma.JsonValue,
+    questionId: string,
+  ): {
+    didChange: boolean;
+    nextOrderData: ExamVersionOrderData;
+  } {
+    const parsedOrderData = this.parseExamVersionOrderData(orderData);
+    const remainingQuestions = parsedOrderData.questions.filter(
+      (question) => question.questionId !== questionId,
+    );
+
+    return {
+      didChange: remainingQuestions.length !== parsedOrderData.questions.length,
+      nextOrderData: {
+        questions: remainingQuestions.map((question, index) => ({
+          ...question,
+          position: index + 1,
+        })),
+      },
+    };
+  }
+
+  private removeQuestionFromAnswerKeyJson(
+    answerKeyJson: Prisma.JsonValue | null,
+    questionId: string,
+  ): Prisma.InputJsonValue | null {
+    if (
+      !answerKeyJson ||
+      typeof answerKeyJson !== 'object' ||
+      Array.isArray(answerKeyJson)
+    ) {
+      return null;
+    }
+
+    const parsedAnswerKey = answerKeyJson as {
+      answers?: unknown;
+      [key: string]: unknown;
+    };
+    const answers = Array.isArray(parsedAnswerKey.answers)
+      ? parsedAnswerKey.answers
+      : [];
+
+    return {
+      ...parsedAnswerKey,
+      answers: answers
+        .filter((answer) => {
+          if (!answer || typeof answer !== 'object' || Array.isArray(answer)) {
+            return false;
+          }
+
+          return (answer as { questionId?: unknown }).questionId !== questionId;
+        })
+        .map((answer, index) => ({
+          ...(answer as Record<string, unknown>),
+          questionNumber: index + 1,
+        })),
+    } as Prisma.InputJsonValue;
+  }
+
+  private extractUploadedFileIdFromContentUrl(
+    contentUrl?: string | null,
+  ): string | null {
+    if (!contentUrl) {
+      return null;
+    }
+
+    const match = contentUrl.match(/^\/uploaded-files\/([^/]+)\/content$/);
+    return match?.[1] ?? null;
+  }
+
+  private async cleanupUploadedFiles(
+    fileIds: string[],
+    authUser: AuthTokenPayload,
+  ): Promise<void> {
+    if (fileIds.length === 0) {
+      return;
+    }
+
+    const uniqueFileIds = [...new Set(fileIds)];
+
+    await Promise.all(
+      uniqueFileIds.map(async (fileId) => {
+        try {
+          await this.uploadedFilesService.remove(fileId, authUser);
+        } catch (error) {
+          if (
+            error instanceof NotFoundException ||
+            error instanceof BadRequestException
+          ) {
+            return;
+          }
+
+          throw error;
+        }
+      }),
+    );
   }
 
   private validateQuestionPayloadForCreate(
@@ -389,11 +589,121 @@ export class QuestionsService {
     id: string,
     authUser: AuthTokenPayload,
   ): Promise<QuestionEntity> {
-    await this.findOne(id, authUser);
-    const question = await this.prisma.question.delete({
+    const question = await this.prisma.question.findUnique({
       where: { id },
-      include: this.questionWithAssetsInclude,
+      include: {
+        ...this.questionWithAssetsInclude,
+        topic: {
+          include: {
+            discipline: {
+              select: { userId: true },
+            },
+          },
+        },
+        examQuestions: {
+          select: {
+            exam: {
+              select: {
+                versions: {
+                  select: {
+                    id: true,
+                    orderData: true,
+                    answerKeyJson: true,
+                    pdfUrl: true,
+                    answerKeyUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
-    return plainToInstance(QuestionEntity, question);
+
+    if (
+      !question ||
+      (!this.isAdmin(authUser) && question.topic.discipline.userId !== authUser.id)
+    ) {
+      throw new NotFoundException(`Question with ID ${id} not found`);
+    }
+
+    const uploadedFileIdsToCleanup = new Set<string>();
+
+    question.questionImages.forEach((questionImage) => {
+      uploadedFileIdsToCleanup.add(questionImage.fileId);
+    });
+
+    question.alternatives.forEach((alternative) => {
+      if (alternative.imageFileId) {
+        uploadedFileIdsToCleanup.add(alternative.imageFileId);
+      }
+    });
+
+    for (const examQuestion of question.examQuestions) {
+      for (const version of examQuestion.exam.versions) {
+        const { didChange, nextOrderData } = this.removeQuestionFromOrderData(
+          version.orderData,
+          id,
+        );
+
+        if (!didChange) {
+          continue;
+        }
+
+        const pdfFileId = this.extractUploadedFileIdFromContentUrl(version.pdfUrl);
+        if (pdfFileId) {
+          uploadedFileIdsToCleanup.add(pdfFileId);
+        }
+
+        const answerKeyFileId = this.extractUploadedFileIdFromContentUrl(
+          version.answerKeyUrl,
+        );
+        if (answerKeyFileId) {
+          uploadedFileIdsToCleanup.add(answerKeyFileId);
+        }
+      }
+    }
+
+    const removedQuestion = await this.prisma.$transaction(async (tx) => {
+      for (const examQuestion of question.examQuestions) {
+        for (const version of examQuestion.exam.versions) {
+          const { didChange, nextOrderData } = this.removeQuestionFromOrderData(
+            version.orderData,
+            id,
+          );
+
+          if (!didChange) {
+            continue;
+          }
+
+          const nextAnswerKeyJson = this.removeQuestionFromAnswerKeyJson(
+            version.answerKeyJson,
+            id,
+          );
+
+          await tx.examVersion.update({
+            where: { id: version.id },
+            data: {
+              orderData: nextOrderData as unknown as Prisma.InputJsonValue,
+              answerKeyJson:
+                nextAnswerKeyJson === null
+                  ? Prisma.DbNull
+                  : nextAnswerKeyJson,
+              pdfUrl: null,
+              answerKeyUrl: null,
+            },
+          });
+        }
+      }
+
+      return tx.question.delete({
+        where: { id },
+        include: this.questionWithAssetsInclude,
+      });
+    });
+
+    await this.cleanupUploadedFiles([...uploadedFileIdsToCleanup], authUser);
+
+    return plainToInstance(QuestionEntity, removedQuestion);
   }
 }
