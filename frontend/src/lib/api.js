@@ -1,4 +1,6 @@
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+import { appConfig } from './app-config';
+
+export const API_URL = appConfig.apiUrl;
 
 export function getStoredToken() {
   return localStorage.getItem('access_token') ?? '';

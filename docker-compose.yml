@@ -52,8 +52,8 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: "http://localhost:3001"
+    env_file:
+      - .env
     ports:
       - "5174:5173"
     volumes:

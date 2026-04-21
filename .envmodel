@@ -1,5 +1,152 @@
+# URL de conexão do Prisma com o banco MySQL.
 DATABASE_URL=mysql://tcc:tcc@mysql:3306/tcc
+
+# Ambiente de execução da aplicação.
 NODE_ENV=development
+
+# Porta exposta pelo backend NestJS.
 PORT=3001
 
+# Chave usada para assinar e validar os tokens JWT.
 JWT_SECRET=sua_chave_secreta_aqui
+
+# URL base da API consumida pelo frontend Vite.
+VITE_API_URL=http://localhost:3001
+
+# Tamanho padrão do espaço de resposta ao criar questão dissertativa.
+APP_DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE=MEDIUM
+
+# Quantidade padrão de colunas usada ao abrir a geração de PDF.
+APP_DEFAULT_PDF_COLUMNS=2
+
+# Define se o nome da versão entra no rodapé do PDF por padrão.
+APP_DEFAULT_PDF_INCLUDE_VERSION_IN_FOOTER=false
+
+# Cor inicial do gradiente de fundo principal da interface.
+APP_THEME_BG_START="#dff7e8"
+
+# Cor intermediária do gradiente de fundo principal da interface.
+APP_THEME_BG_MID="#f5f2e8"
+
+# Cor final do gradiente de fundo principal da interface.
+APP_THEME_BG_END="#f9f6ef"
+
+# Cor base dos cartões e superfícies principais.
+APP_THEME_SURFACE="#fffdf8"
+
+# Cor de superfícies com mais destaque no frontend.
+APP_THEME_SURFACE_STRONG="#f4efe4"
+
+# Cor plana usada em campos e blocos brancos.
+APP_THEME_SURFACE_PLAIN="#ffffff"
+
+# Cor suave usada em cartões e áreas secundárias.
+APP_THEME_SURFACE_SUBTLE="#fdfdfb"
+
+# Cor de hover e destaque leve em tabelas e blocos.
+APP_THEME_SURFACE_MUTED="#f4f8f2"
+
+# Cor suave alternativa usada em seções secundárias.
+APP_THEME_SURFACE_MUTED_ALT="#f5f8f2"
+
+# Cor mais forte da superfície alternativa.
+APP_THEME_SURFACE_MUTED_ALT_STRONG="#edf3e8"
+
+# Cor de fundo de painéis primários expansíveis.
+APP_THEME_PRIMARY_PANEL="#eef5ee"
+
+# Cor de hover dos painéis primários expansíveis.
+APP_THEME_PRIMARY_PANEL_STRONG="#e4efe4"
+
+# Cor de fundo de estados ativos e destaques.
+APP_THEME_PRIMARY_SOFT="#d5ecd8"
+
+# Cor da borda de estados ativos e destaques.
+APP_THEME_PRIMARY_SOFT_BORDER="#9ecfa8"
+
+# Cor do texto sobre estados ativos e destaques.
+APP_THEME_PRIMARY_SOFT_TEXT="#0f3c2c"
+
+# Sombra usada em cartões ativos e selecionados.
+APP_THEME_PRIMARY_SOFT_SHADOW="rgba(115, 180, 135, 0.18)"
+
+# Cor da borda de mensagens de sucesso.
+APP_THEME_SUCCESS_BORDER="#b6dcc2"
+
+# Cor de fundo de mensagens de sucesso.
+APP_THEME_SUCCESS_SURFACE="#ecf9f0"
+
+# Cor de fundo de painéis de destaque positivo.
+APP_THEME_SUCCESS_PANEL="#edf8f0"
+
+# Cor da borda de mensagens de erro.
+APP_THEME_ERROR_BORDER="#e2b7b7"
+
+# Cor de fundo de mensagens de erro.
+APP_THEME_ERROR_SURFACE="#f9ebeb"
+
+# Cor principal do texto padrão da interface.
+APP_THEME_INK="#142218"
+
+# Cor do texto mais forte, como títulos de cards.
+APP_THEME_INK_STRONG="#142417"
+
+# Cor do texto secundário da interface.
+APP_THEME_INK_SOFT="#4b5c4f"
+
+# Cor do texto auxiliar e metadados.
+APP_THEME_INK_MUTED="#5d7163"
+
+# Cor principal da identidade visual e botões primários.
+APP_THEME_PRIMARY="#116042"
+
+# Cor de hover/ênfase da cor primária.
+APP_THEME_PRIMARY_STRONG="#0b4a33"
+
+# Cor principal usada para ações destrutivas.
+APP_THEME_DANGER="#8a2323"
+
+# Cor de hover das ações destrutivas.
+APP_THEME_DANGER_STRONG="#761c1c"
+
+# Cor padrão das bordas da interface.
+APP_THEME_BORDER="#d2d7cf"
+
+# Cor do anel de foco e seleção.
+APP_THEME_FOCUS_RING="#73b487"
+
+# Cor escura translúcida do fundo dos modais.
+APP_THEME_OVERLAY="rgba(8, 19, 12, 0.45)"
+
+# Sombra padrão dos cartões e modais.
+APP_THEME_SHADOW="0 12px 28px rgba(26, 56, 40, 0.12)"
+
+# Tamanho de página usado na geração dos PDFs.
+APP_PDF_PAGE_SIZE=A4
+
+# Tamanho base da fonte do conteúdo do PDF.
+APP_PDF_BASE_FONT_SIZE=9.5
+
+# Cor de textos secundários e rodapé do PDF.
+APP_PDF_MUTED_COLOR="#4f5c52"
+
+# Cor de subtítulos no PDF.
+APP_PDF_SUBTLE_TEXT_COLOR="#59665c"
+
+# Cor das linhas e bordas de tabelas no PDF.
+APP_PDF_BORDER_COLOR="#cbd5cc"
+
+# Cor da borda da caixa de resposta dissertativa no PDF.
+APP_PDF_ANSWER_SPACE_BORDER_COLOR="#aeb9af"
+
+# Cor do texto de fallback quando uma imagem não entra no PDF.
+APP_PDF_IMAGE_FALLBACK_COLOR="#6d776d"
+
+# Altura do espaço de resposta pequeno para questões dissertativas no PDF.
+APP_DISSERTATIVE_SPACE_SMALL_HEIGHT=70
+
+# Altura do espaço de resposta médio para questões dissertativas no PDF.
+APP_DISSERTATIVE_SPACE_MEDIUM_HEIGHT=120
+
+# Altura do espaço de resposta grande para questões dissertativas no PDF.
+APP_DISSERTATIVE_SPACE_LARGE_HEIGHT=190

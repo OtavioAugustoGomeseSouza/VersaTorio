@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_URL, apiRequest, apiUploadFile } from '../lib/api';
+import { appConfig } from '../lib/app-config';
+
+const DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE =
+  appConfig.defaults.dissertativeAnswerSpaceSize;
 
 function optionLetter(index) {
   return String.fromCharCode(65 + index);
@@ -145,7 +149,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
   const [questionText, setQuestionText] = useState('');
   const [questionAnswerText, setQuestionAnswerText] = useState('');
-  const [questionAnswerSpaceSize, setQuestionAnswerSpaceSize] = useState('MEDIUM');
+  const [questionAnswerSpaceSize, setQuestionAnswerSpaceSize] = useState(
+    DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE,
+  );
   const [questionImageDrafts, setQuestionImageDrafts] = useState([]);
   const [questionAlternatives, setQuestionAlternatives] = useState([
     createAlternativeDraft(),
@@ -274,7 +280,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionType('MULTIPLE_CHOICE');
     setQuestionText('');
     setQuestionAnswerText('');
-    setQuestionAnswerSpaceSize('MEDIUM');
+    setQuestionAnswerSpaceSize(DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE);
     setQuestionImageDrafts([]);
     setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
   }
@@ -352,7 +358,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionType(question.type);
     setQuestionText(question.text ?? '');
     setQuestionAnswerText(question.answerText ?? '');
-    setQuestionAnswerSpaceSize(question.answerSpaceSize ?? 'MEDIUM');
+    setQuestionAnswerSpaceSize(
+      question.answerSpaceSize ?? DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE,
+    );
     setQuestionImageDrafts(questionImageDraftsFromQuestion);
     setQuestionAlternatives(normalizedAlternatives);
     setShowQuestionModal(true);
@@ -375,7 +383,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
     if (nextType === 'MULTIPLE_CHOICE') {
       setQuestionAnswerText('');
-      setQuestionAnswerSpaceSize('MEDIUM');
+      setQuestionAnswerSpaceSize(DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE);
       return;
     }
 

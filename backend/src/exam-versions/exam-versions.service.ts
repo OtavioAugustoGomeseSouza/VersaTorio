@@ -17,6 +17,7 @@ import {
 } from '../auth/interfaces/auth-token-payload.interface';
 import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
 import { UploadedFilesService } from '../uploaded-files/uploaded-files.service';
+import { getExamPdfConfig } from './exam-pdf.config';
 
 type PdfDocumentNode = Record<string, unknown>;
 type PdfMake = {
@@ -70,6 +71,8 @@ type AnswerKeyJson = {
 
 @Injectable()
 export class ExamVersionsService {
+  private readonly pdfConfig = getExamPdfConfig();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadedFilesService: UploadedFilesService,
@@ -434,8 +437,8 @@ export class ExamVersionsService {
         body: rows,
       },
       layout: {
-        hLineColor: () => '#cbd5cc',
-        vLineColor: () => '#cbd5cc',
+        hLineColor: () => this.pdfConfig.borderColor,
+        vLineColor: () => this.pdfConfig.borderColor,
       },
       margin: [0, 0, 0, 12],
     };
@@ -513,21 +516,19 @@ export class ExamVersionsService {
   private buildAnswerSpace(
     answerSpaceSize: AnswerSpaceSize | null,
   ): PdfDocumentNode {
-    const heightBySize: Record<AnswerSpaceSize, number> = {
-      [AnswerSpaceSize.SMALL]: 70,
-      [AnswerSpaceSize.MEDIUM]: 120,
-      [AnswerSpaceSize.LARGE]: 190,
-    };
-
     return {
       table: {
         widths: ['*'],
-        heights: [heightBySize[answerSpaceSize ?? AnswerSpaceSize.MEDIUM]],
+        heights: [
+          this.pdfConfig.answerSpaceHeights[
+            answerSpaceSize ?? AnswerSpaceSize.MEDIUM
+          ],
+        ],
         body: [[{ text: '' }]],
       },
       layout: {
-        hLineColor: () => '#aeb9af',
-        vLineColor: () => '#aeb9af',
+        hLineColor: () => this.pdfConfig.answerSpaceBorderColor,
+        vLineColor: () => this.pdfConfig.answerSpaceBorderColor,
       },
       margin: [0, 8, 0, 0],
     };
@@ -558,7 +559,7 @@ export class ExamVersionsService {
         content.push({
           text: 'Imagem não incluída no PDF.',
           italics: true,
-          color: '#6d776d',
+          color: this.pdfConfig.imageFallbackColor,
         });
       }
     }
@@ -606,7 +607,7 @@ export class ExamVersionsService {
           : {
               text: 'Imagem da questão não incluída no PDF.',
               italics: true,
-              color: '#6d776d',
+              color: this.pdfConfig.imageFallbackColor,
               margin: [0, 4, 0, 2],
             },
       );
@@ -692,12 +693,13 @@ export class ExamVersionsService {
     }
 
     return {
-      pageSize: 'A4',
+      pageSize: this.pdfConfig.pageSize,
       pageMargins: [36, 40, 36, 48],
       defaultStyle: {
         font: 'Roboto',
-        fontSize: 9.5,
+        fontSize: this.pdfConfig.baseFontSize,
         lineHeight: 1.15,
+        color: this.pdfConfig.textColor,
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
@@ -713,14 +715,14 @@ export class ExamVersionsService {
                   text: examVersion.name,
                   alignment: 'right',
                   fontSize: 7,
-                  color: '#6d776d',
+                  color: this.pdfConfig.mutedColor,
                 },
               ]
             : []),
         ],
         margin: [36, 0, 36, 18],
         fontSize: 8,
-        color: '#4f5c52',
+        color: this.pdfConfig.mutedColor,
       }),
       content: [
         {
@@ -742,11 +744,11 @@ export class ExamVersionsService {
         },
         examSubtitle: {
           fontSize: 9,
-          color: '#59665c',
+          color: this.pdfConfig.subtleTextColor,
           margin: [0, 0, 0, 10],
         },
         questionText: {
-          fontSize: 9.5,
+          fontSize: this.pdfConfig.baseFontSize,
           bold: false,
         },
       },
@@ -831,7 +833,7 @@ export class ExamVersionsService {
         content.push({
           text: 'Imagem não incluída no PDF.',
           italics: true,
-          color: '#6d776d',
+          color: this.pdfConfig.imageFallbackColor,
         });
       }
     }
@@ -846,12 +848,16 @@ export class ExamVersionsService {
           text: `${isCorrect ? '[X]' : '[ ]'} ${optionLetter}.`,
           width: 42,
           bold: true,
-          color: isCorrect ? '#116042' : '#4f5c52',
+          color: isCorrect
+            ? this.pdfConfig.accentColor
+            : this.pdfConfig.mutedColor,
         },
         {
           stack: content.length > 0 ? content : [{ text: '-' }],
           width: '*',
-          color: isCorrect ? '#116042' : '#142218',
+          color: isCorrect
+            ? this.pdfConfig.accentColor
+            : this.pdfConfig.textColor,
           bold: isCorrect,
         },
       ],
@@ -886,7 +892,7 @@ export class ExamVersionsService {
           : {
               text: 'Imagem da questão não incluída no PDF.',
               italics: true,
-              color: '#6d776d',
+              color: this.pdfConfig.imageFallbackColor,
               margin: [0, 4, 0, 2],
             },
       );
@@ -957,19 +963,20 @@ export class ExamVersionsService {
     }
 
     return {
-      pageSize: 'A4',
+      pageSize: this.pdfConfig.pageSize,
       pageMargins: [36, 40, 36, 48],
       defaultStyle: {
         font: 'Roboto',
-        fontSize: 9.5,
+        fontSize: this.pdfConfig.baseFontSize,
         lineHeight: 1.15,
+        color: this.pdfConfig.textColor,
       },
       footer: (currentPage: number, pageCount: number) => ({
         text: `Página ${currentPage} de ${pageCount}`,
         alignment: 'center',
         margin: [36, 0, 36, 18],
         fontSize: 8,
-        color: '#4f5c52',
+        color: this.pdfConfig.mutedColor,
       }),
       content: [
         {
@@ -983,7 +990,7 @@ export class ExamVersionsService {
         {
           text: 'Alternativas corretas estão marcadas com [X].',
           margin: [0, 0, 0, 10],
-          color: '#4f5c52',
+          color: this.pdfConfig.mutedColor,
         },
         { stack: questionNodes },
       ],
@@ -995,11 +1002,11 @@ export class ExamVersionsService {
         },
         examSubtitle: {
           fontSize: 9,
-          color: '#59665c',
+          color: this.pdfConfig.subtleTextColor,
           margin: [0, 0, 0, 10],
         },
         questionText: {
-          fontSize: 9.5,
+          fontSize: this.pdfConfig.baseFontSize,
           bold: false,
         },
       },

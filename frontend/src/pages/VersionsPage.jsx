@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_URL, apiRequest } from '../lib/api';
+import { appConfig } from '../lib/app-config';
+
+const DEFAULT_PDF_COLUMNS = appConfig.defaults.pdfColumns;
+const DEFAULT_PDF_INCLUDE_VERSION_IN_FOOTER =
+  appConfig.defaults.pdfIncludeVersionInFooter;
 
 function createHeaderFieldId() {
   return `pdf-field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -116,8 +121,10 @@ export default function VersionsPage({ token, onUnauthorized }) {
   const [pdfHeaderFields, setPdfHeaderFields] = useState(
     createDefaultHeaderFields,
   );
-  const [pdfColumns, setPdfColumns] = useState(2);
-  const [includeVersionInFooter, setIncludeVersionInFooter] = useState(false);
+  const [pdfColumns, setPdfColumns] = useState(DEFAULT_PDF_COLUMNS);
+  const [includeVersionInFooter, setIncludeVersionInFooter] = useState(
+    DEFAULT_PDF_INCLUDE_VERSION_IN_FOOTER,
+  );
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingAnswerKeyId, setGeneratingAnswerKeyId] = useState('');
 
@@ -237,8 +244,8 @@ export default function VersionsPage({ token, onUnauthorized }) {
   function openPdfModal(version) {
     setPdfVersion(version);
     setPdfHeaderFields(createDefaultHeaderFields());
-    setPdfColumns(2);
-    setIncludeVersionInFooter(false);
+    setPdfColumns(DEFAULT_PDF_COLUMNS);
+    setIncludeVersionInFooter(DEFAULT_PDF_INCLUDE_VERSION_IN_FOOTER);
     setMessage('');
   }
 

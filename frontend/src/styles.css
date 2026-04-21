@@ -7,12 +7,33 @@
   );
   --surface: #fffdf8;
   --surface-strong: #f4efe4;
+  --surface-plain: #fff;
+  --surface-subtle: #fdfdfb;
+  --surface-muted: #f4f8f2;
+  --surface-muted-alt: #f5f8f2;
+  --surface-muted-alt-strong: #edf3e8;
+  --primary-panel: #eef5ee;
+  --primary-panel-strong: #e4efe4;
+  --primary-soft: #d5ecd8;
+  --primary-soft-border: #9ecfa8;
+  --primary-soft-text: #0f3c2c;
+  --primary-soft-shadow: rgba(115, 180, 135, 0.18);
+  --success-border: #b6dcc2;
+  --success-surface: #ecf9f0;
+  --success-panel: #edf8f0;
+  --error-border: #e2b7b7;
+  --error-surface: #f9ebeb;
   --ink: #142218;
+  --ink-strong: #142417;
   --ink-soft: #4b5c4f;
+  --ink-muted: #5d7163;
   --primary: #116042;
   --primary-strong: #0b4a33;
   --danger: #8a2323;
+  --danger-strong: #761c1c;
   --border: #d2d7cf;
+  --focus-ring: #73b487;
+  --overlay: rgba(8, 19, 12, 0.45);
   --shadow: 0 12px 28px rgba(26, 56, 40, 0.12);
 }
 
@@ -53,7 +74,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.65rem 0.75rem;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 button {
@@ -156,8 +177,8 @@ legend {
 }
 
 .nav-link-active {
-  background: #d5ecd8;
-  color: #0f3c2c;
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
   font-weight: 600;
 }
 
@@ -189,13 +210,13 @@ legend {
 .feedback {
   padding: 0.7rem 0.8rem;
   border-radius: 10px;
-  border: 1px solid #b6dcc2;
-  background: #ecf9f0;
+  border: 1px solid var(--success-border);
+  background: var(--success-surface);
 }
 
 .feedback.error {
-  border-color: #e2b7b7;
-  background: #f9ebeb;
+  border-color: var(--error-border);
+  background: var(--error-surface);
 }
 
 .muted {
@@ -237,11 +258,11 @@ legend {
 }
 
 .table-row-clickable:hover {
-  background: #f4f8f2;
+  background: var(--surface-muted);
 }
 
 .table-row-clickable:focus-visible {
-  outline: 2px solid #73b487;
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -250,7 +271,7 @@ legend {
 }
 
 .danger-btn:hover {
-  background: #761c1c;
+  background: var(--danger-strong);
 }
 
 .ghost-btn {
@@ -308,7 +329,7 @@ legend {
 .question-group {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface-plain);
   overflow: hidden;
 }
 
@@ -321,7 +342,7 @@ legend {
 .question-topic {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fdfdfb;
+  background: var(--surface-subtle);
   overflow: hidden;
   padding: 8px;
 }
@@ -332,7 +353,7 @@ legend {
   align-items: center;
   gap: 0.45rem;
   border-radius: 0;
-  background: #eef5ee;
+  background: var(--primary-panel);
   color: var(--ink);
   border: 0;
   text-align: left;
@@ -340,16 +361,16 @@ legend {
 }
 
 .collapse-toggle:hover {
-  background: #e4efe4;
+  background: var(--primary-panel-strong);
 }
 
 .collapse-toggle-topic {
-  background: #f5f8f2;
+  background: var(--surface-muted-alt);
   font-weight: 500;
 }
 
 .collapse-toggle-topic:hover {
-  background: #edf3e8;
+  background: var(--surface-muted-alt-strong);
 }
 
 .collapse-arrow {
@@ -391,7 +412,7 @@ legend {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.7rem;
-  background: #fff;
+  background: var(--surface-plain);
   display: grid;
   gap: 0.45rem;
 }
@@ -401,7 +422,7 @@ legend {
 }
 
 .question-card:hover {
-  border-color: #9ecfa8;
+  border-color: var(--primary-soft-border);
 }
 
 .question-card-header {
@@ -416,7 +437,7 @@ legend {
   font-size: 1.03rem;
   font-weight: 700;
   line-height: 1.35;
-  color: #142417;
+  color: var(--ink-strong);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -428,7 +449,7 @@ legend {
   margin: 0;
   font-size: 0.86rem;
   font-weight: 500;
-  color: #5d7163;
+  color: var(--ink-muted);
 }
 
 .icon-btn {
@@ -469,13 +490,13 @@ legend {
 }
 
 .discipline-card:hover {
-  border-color: #9ecfa8;
+  border-color: var(--primary-soft-border);
 }
 
 .discipline-card-active {
-  border-color: #73b487;
-  box-shadow: 0 0 0 3px rgba(115, 180, 135, 0.18);
-  background: #f5fbf6;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--primary-soft-shadow);
+  background: var(--success-surface);
 }
 
 .topic-inline-list {
@@ -486,8 +507,8 @@ legend {
 }
 
 .spotlight-block {
-  border: 1px solid #b6dcc2;
-  background: #edf8f0;
+  border: 1px solid var(--success-border);
+  background: var(--success-panel);
   border-radius: 10px;
   padding: 0.65rem;
   display: grid;
@@ -497,7 +518,7 @@ legend {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 19, 12, 0.45);
+  background: var(--overlay);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -530,7 +551,7 @@ legend {
   padding: 0.65rem;
   display: grid;
   gap: 0.55rem;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 .upload-row {
@@ -539,7 +560,7 @@ legend {
   padding: 0.65rem;
   display: grid;
   gap: 0.55rem;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 .pdf-config-section {
@@ -548,7 +569,7 @@ legend {
   padding: 0.75rem;
   display: grid;
   gap: 0.65rem;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 .pdf-header-fields {
@@ -577,7 +598,7 @@ legend {
   min-height: 720px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 .question-images-grid {
@@ -593,7 +614,7 @@ legend {
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #f4f7f1;
+  background: var(--surface-muted-alt-strong);
 }
 
 .alternative-image-inline {
@@ -631,9 +652,9 @@ legend {
 }
 
 .mode-btn-active {
-  background: #d5ecd8;
-  border-color: #9ecfa8;
-  color: #0f3c2c;
+  background: var(--primary-soft);
+  border-color: var(--primary-soft-border);
+  color: var(--primary-soft-text);
   font-weight: 600;
 }
 
@@ -655,7 +676,7 @@ legend {
   padding: 0.8rem;
   display: grid;
   gap: 0.55rem;
-  background: #fff;
+  background: var(--surface-plain);
 }
 
 .compact-list {
@@ -668,7 +689,7 @@ legend {
 .json-block {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #f4f7f1;
+  background: var(--surface-muted-alt-strong);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.8rem;
