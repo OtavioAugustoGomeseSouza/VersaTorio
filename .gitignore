@@ -51,3 +51,9 @@ Desktop.ini
 # =========================
 **/mysql_data/
 **/.dockerignore
+backend/uploads/
+
+# =========================
+# Markdown
+# =========================
+**/*.md

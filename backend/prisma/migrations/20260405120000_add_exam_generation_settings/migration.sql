@@ -1,0 +1,4 @@
+ALTER TABLE `Exam`
+ADD COLUMN `shuffleQuestions` BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN `shuffleAlternatives` BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN `versionsCountDefault` INTEGER NOT NULL DEFAULT 1;

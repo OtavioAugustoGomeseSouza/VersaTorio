@@ -7,7 +7,7 @@ services:
       MYSQL_USER: tcc
       MYSQL_PASSWORD: tcc
     ports:
-      - "3307:3306"
+      - "3308:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
@@ -20,7 +20,9 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     depends_on:
       mysql:
         condition: service_healthy
@@ -28,11 +30,14 @@ services:
       NODE_ENV: development
       PORT: 3000
       DATABASE_URL: "mysql://tcc:tcc@mysql:3306/tcc"
+      UPLOAD_ROOT_DIR: "/app/uploads"
+      UPLOAD_MAX_FILE_SIZE_BYTES: "20971520"
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - backend_uploads:/app/uploads
     command: >
       sh -c "
       npm ci &&
@@ -41,5 +46,25 @@ services:
       npm run start:dev
       "
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    ports:
+      - "5174:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: >
+      sh -c "
+      npm install &&
+      npm run dev
+      "
+
 volumes:
   mysql_data:
+  backend_uploads:

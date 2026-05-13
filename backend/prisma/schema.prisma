@@ -1,3 +1,24 @@
+enum Role {
+  ADMIN
+  USER
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  DISSERTATIVE
+}
+
+enum AnswerSpaceSize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum AlternativeType {
+  TEXT
+  IMAGE
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,10 +29,145 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id          String       @id @default(uuid())
+  name        String?
+  email       String       @unique
+  password    String
+  role        Role         @default(USER)
+  disciplines Discipline[]
+  exams       Exam[]
+  uploadedFiles UploadedFile[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Discipline {
+  id        String   @id @default(uuid())
   name      String
-  email     String   @unique
-  password  String
+  userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  exams  Exam[]
+  topics Topic[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Subject")
+}
+
+model Topic {
+  id           String   @id @default(uuid())
+  name         String
+  disciplineId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  questions  Question[]
+
+  @@unique([disciplineId, name])
+}
+
+model Exam {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  shuffleQuestions    Boolean  @default(true)
+  shuffleAlternatives Boolean  @default(true)
+  versionsCountDefault Int     @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  userId       String
+  disciplineId String   @map("subjectId")
+
+  examQuestions ExamQuestion[]
+  versions      ExamVersion[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discipline    Discipline     @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id            String         @id @default(uuid())
+  text          String         @db.Text
+  type          QuestionType
+  answerText    String?        @db.Text
+  answerSpaceSize AnswerSpaceSize?
+  topicId       String
+  alternatives  Alternative[]
+  examQuestions ExamQuestion[]
+  questionImages QuestionImage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model ExamQuestion {
+  id         String   @id @default(uuid())
+  examId     String
+  questionId String
+  createdAt  DateTime @default(now())
+
+  exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, questionId])
+  @@index([questionId])
+}
+
+model ExamVersion {
+  id        String   @id @default(uuid())
+  name      String // "Versão A", "Versão B"
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  orderData Json // Armazena a estrutura embaralhada: { questions: [{ id, alternatives: [id, id] }] }
+  pdfUrl    String?
+  answerKeyJson Json?
+  answerKeyUrl String?
+  createdAt DateTime @default(now())
+}
+
+model Alternative {
+  id         String          @id @default(uuid())
+  text       String
+  type       AlternativeType
+  isCorrect  Boolean
+  questionId String
+  imageFileId String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  imageFile UploadedFile? @relation("AlternativeImageFile", fields: [imageFileId], references: [id])
+}
+
+model UploadedFile {
+  id           String   @id @default(uuid())
+  userId       String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String   @unique
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionImages QuestionImage[] @relation("QuestionImageFile")
+  alternativeImages Alternative[] @relation("AlternativeImageFile")
+
+  @@index([userId])
+}
+
+model QuestionImage {
+  id         String   @id @default(uuid())
+  questionId String
+  fileId     String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  file     UploadedFile @relation("QuestionImageFile", fields: [fileId], references: [id])
+
+  @@unique([questionId, fileId])
+  @@index([questionId])
+  @@index([fileId])
 }
