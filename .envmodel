@@ -13,6 +13,9 @@ JWT_SECRET=sua_chave_secreta_aqui
 # URL base da API consumida pelo frontend Vite.
 VITE_API_URL=http://localhost:3001
 
+# Origens autorizadas a acessar o backend via CORS.
+APP_CORS_ORIGINS=http://localhost:5173,http://localhost:5174
+
 # Tamanho padrão do espaço de resposta ao criar questão dissertativa.
 APP_DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE=MEDIUM
 
