@@ -10,6 +10,7 @@ import {
 import { ExamVersionsService } from './exam-versions.service';
 import { CreateExamVersionDto } from './dto/create-exam-version.dto';
 import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
+import { GenerateExamVersionAnswerKeyDto } from './dto/generate-exam-version-answer-key.dto';
 import { type AuthenticatedRequest } from '../auth/interfaces/auth-token-payload.interface';
 
 @Controller('exam-versions')
@@ -60,10 +61,15 @@ export class ExamVersionsController {
   @Post(':id/generate-answer-key')
   generateAnswerKey(
     @Param('id') id: string,
+    @Body() generateExamVersionAnswerKeyDto: GenerateExamVersionAnswerKeyDto,
     @Req() request: AuthenticatedRequest,
   ) {
     const authUser = request.user;
-    return this.examVersionsService.generateAnswerKey(id, authUser);
+    return this.examVersionsService.generateAnswerKey(
+      id,
+      generateExamVersionAnswerKeyDto,
+      authUser,
+    );
   }
 
   @Delete(':id')

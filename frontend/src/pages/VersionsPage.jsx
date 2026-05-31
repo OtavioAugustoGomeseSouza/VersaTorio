@@ -416,6 +416,9 @@ export default function VersionsPage({ token, onUnauthorized }) {
         {
           method: 'POST',
           token,
+          body: {
+            columns: Number(pdfColumns),
+          },
         },
       );
 

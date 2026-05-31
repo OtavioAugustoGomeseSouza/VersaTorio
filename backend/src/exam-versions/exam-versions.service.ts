@@ -16,6 +16,7 @@ import {
   UserRole,
 } from '../auth/interfaces/auth-token-payload.interface';
 import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
+import { GenerateExamVersionAnswerKeyDto } from './dto/generate-exam-version-answer-key.dto';
 import { UploadedFilesService } from '../uploaded-files/uploaded-files.service';
 import { getExamPdfConfig } from './exam-pdf.config';
 
@@ -541,7 +542,20 @@ export class ExamVersionsService {
     authUser: AuthTokenPayload,
   ): Promise<PdfDocumentNode> {
     const optionLetter = String.fromCharCode(65 + index);
-    const content: PdfDocumentNode[] = [];
+    const stack: PdfDocumentNode[] = [];
+    const alternativeText = alternative.text?.trim();
+
+    stack.push({
+      text: [
+        { text: `${optionLetter}. `, bold: true },
+        {
+          text:
+            alternativeText && alternativeText.length > 0
+              ? alternativeText
+              : '-',
+        },
+      ],
+    });
 
     if (alternative.type === AlternativeType.IMAGE && alternative.imageFileId) {
       const imageData = await this.loadPdfImage(
@@ -550,32 +564,23 @@ export class ExamVersionsService {
       );
 
       if (imageData) {
-        content.push({
+        stack.push({
           image: imageData,
           fit: columns === 2 ? [150, 90] : [260, 130],
-          margin: [0, 2, 0, 2],
+          margin: [18, 2, 0, 2],
         });
       } else {
-        content.push({
+        stack.push({
           text: 'Imagem não incluída no PDF.',
           italics: true,
           color: this.pdfConfig.imageFallbackColor,
+          margin: [18, 2, 0, 2],
         });
       }
     }
 
-    if (alternative.text) {
-      content.unshift({
-        text: alternative.text,
-      });
-    }
-
     return {
-      columns: [
-        { text: `${optionLetter}.`, width: 18, bold: true },
-        { stack: content.length > 0 ? content : [{ text: '-' }], width: '*' },
-      ],
-      columnGap: 4,
+      stack,
       margin: [0, 3, 0, 0],
     };
   }
@@ -654,7 +659,7 @@ export class ExamVersionsService {
     return {
       columns: [
         { stack: questionNodes, width: '*' },
-        { text: '', width: '*' },
+        { stack: [], width: '*' },
       ],
       columnGap: 18,
       snakingColumns: true,
@@ -811,11 +816,35 @@ export class ExamVersionsService {
   private async buildAnswerKeyAlternativeNode(
     alternative: ExamAlternativeForPdf,
     index: number,
+    columns: 1 | 2,
     authUser: AuthTokenPayload,
   ): Promise<PdfDocumentNode> {
     const optionLetter = String.fromCharCode(65 + index);
     const isCorrect = alternative.isCorrect;
-    const content: PdfDocumentNode[] = [];
+    const stack: PdfDocumentNode[] = [];
+    const alternativeText = alternative.text?.trim();
+
+    stack.push({
+      text: [
+        {
+          text: `${isCorrect ? '[X]' : '[ ]'} ${optionLetter}. `,
+          bold: true,
+          color: isCorrect
+            ? this.pdfConfig.accentColor
+            : this.pdfConfig.mutedColor,
+        },
+        {
+          text:
+            alternativeText && alternativeText.length > 0
+              ? alternativeText
+              : '-',
+          color: isCorrect
+            ? this.pdfConfig.accentColor
+            : this.pdfConfig.textColor,
+          bold: isCorrect,
+        },
+      ],
+    });
 
     if (alternative.type === AlternativeType.IMAGE && alternative.imageFileId) {
       const imageData = await this.loadPdfImage(
@@ -824,44 +853,23 @@ export class ExamVersionsService {
       );
 
       if (imageData) {
-        content.push({
+        stack.push({
           image: imageData,
-          fit: [180, 95],
-          margin: [0, 3, 0, 2],
+          fit: columns === 2 ? [150, 85] : [180, 95],
+          margin: [42, 3, 0, 2],
         });
       } else {
-        content.push({
+        stack.push({
           text: 'Imagem não incluída no PDF.',
           italics: true,
           color: this.pdfConfig.imageFallbackColor,
+          margin: [42, 3, 0, 2],
         });
       }
     }
 
-    if (alternative.text) {
-      content.unshift({ text: alternative.text });
-    }
-
     return {
-      columns: [
-        {
-          text: `${isCorrect ? '[X]' : '[ ]'} ${optionLetter}.`,
-          width: 42,
-          bold: true,
-          color: isCorrect
-            ? this.pdfConfig.accentColor
-            : this.pdfConfig.mutedColor,
-        },
-        {
-          stack: content.length > 0 ? content : [{ text: '-' }],
-          width: '*',
-          color: isCorrect
-            ? this.pdfConfig.accentColor
-            : this.pdfConfig.textColor,
-          bold: isCorrect,
-        },
-      ],
-      columnGap: 6,
+      stack,
       margin: [0, 3, 0, 0],
     };
   }
@@ -870,6 +878,7 @@ export class ExamVersionsService {
     question: ExamQuestionForPdf,
     orderedQuestion: OrderedQuestion,
     index: number,
+    columns: 1 | 2,
     authUser: AuthTokenPayload,
   ): Promise<PdfDocumentNode> {
     const stack: PdfDocumentNode[] = [
@@ -886,7 +895,7 @@ export class ExamVersionsService {
         imageData
           ? {
               image: imageData,
-              fit: [480, 210],
+              fit: columns === 2 ? [210, 120] : [480, 210],
               margin: [0, 6, 0, 4],
             }
           : {
@@ -921,6 +930,7 @@ export class ExamVersionsService {
           await this.buildAnswerKeyAlternativeNode(
             orderedAlternatives[alternativeIndex],
             alternativeIndex,
+            columns,
             authUser,
           ),
         );
@@ -935,6 +945,7 @@ export class ExamVersionsService {
 
   private async buildAnswerKeyPdfDefinition(
     examVersion: AccessibleExamVersionForPdf,
+    columns: 1 | 2,
     authUser: AuthTokenPayload,
   ): Promise<Record<string, unknown>> {
     const headerContent = this.buildExamHeaderContent(examVersion);
@@ -957,6 +968,7 @@ export class ExamVersionsService {
           question,
           orderedQuestion,
           index + 1,
+          columns,
           authUser,
         ),
       );
@@ -992,7 +1004,7 @@ export class ExamVersionsService {
           margin: [0, 0, 0, 10],
           color: this.pdfConfig.mutedColor,
         },
-        { stack: questionNodes },
+        this.buildQuestionsContent(questionNodes, columns),
       ],
       styles: {
         examTitle: {
@@ -1069,11 +1081,16 @@ export class ExamVersionsService {
     });
   }
 
-  async generateAnswerKey(id: string, authUser: AuthTokenPayload) {
+  async generateAnswerKey(
+    id: string,
+    generateAnswerKeyDto: GenerateExamVersionAnswerKeyDto | undefined,
+    authUser: AuthTokenPayload,
+  ) {
     const examVersion = await this.getAccessibleExamVersionForPdf(id, authUser);
     const answerKeyJson = this.buildAnswerKeyJson(examVersion);
     const docDefinition = await this.buildAnswerKeyPdfDefinition(
       examVersion,
+      generateAnswerKeyDto?.columns ?? 2,
       authUser,
     );
     const pdfBuffer = await pdfMake.createPdf(docDefinition).getBuffer();
