@@ -790,7 +790,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     );
 
     if (isMultipleChoice && invalidImageAlternative) {
-      setMessage('Alternativas IMAGE precisam de arquivo');
+      setMessage('Alternativas de imagem precisam de arquivo');
       return;
     }
 
@@ -1447,7 +1447,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 <option value="DISSERTATIVE">Dissertativa</option>
               </select>
 
-              <label htmlFor="modal-question-text">Texto da questão</label>
+              <label htmlFor="modal-question-text">Enunciado da questão</label>
               <textarea
                 id="modal-question-text"
                 rows={4}
@@ -1574,8 +1574,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                               });
                             }}
                           >
-                            <option value="TEXT">TEXT</option>
-                            <option value="IMAGE">IMAGE</option>
+                            <option value="TEXT">Texto</option>
+                            <option value="IMAGE">Imagem</option>
                           </select>
                         </label>
 

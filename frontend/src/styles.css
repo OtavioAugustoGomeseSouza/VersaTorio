@@ -147,7 +147,15 @@ legend {
 
 .brand {
   font-weight: 700;
-  letter-spacing: 0.03em;
+  font-size: 1.15rem;
+}
+
+.brand-primary {
+  color: var(--primary);
+}
+
+.brand-secondary {
+  color: var(--ink-strong);
 }
 
 .layout-grid {

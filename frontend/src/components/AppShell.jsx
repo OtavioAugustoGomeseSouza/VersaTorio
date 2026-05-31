@@ -11,7 +11,10 @@ export default function AppShell({ currentPath, onLogout, children }) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">Sistema de Provas</div>
+        <div className="brand" aria-label="VersaTório">
+          <span className="brand-primary">Versa</span>
+          <span className="brand-secondary">Tório</span>
+        </div>
         <button type="button" className="ghost-btn" onClick={onLogout}>
           Sair
         </button>
