@@ -41,6 +41,14 @@ function formatAnswerSpaceSize(size) {
   return '-';
 }
 
+function normalizeSearchText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function createAlternativeDraft(initial = {}) {
   return {
     draftId: createDraftId('alt'),
@@ -143,11 +151,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [topicName, setTopicName] = useState('');
   const [topicDisciplineId, setTopicDisciplineId] = useState('');
   const [selectedDisciplineFilterId, setSelectedDisciplineFilterId] = useState('');
+  const [disciplineSearchTerm, setDisciplineSearchTerm] = useState('');
 
   const [questionDisciplineId, setQuestionDisciplineId] = useState('');
   const [questionTopicId, setQuestionTopicId] = useState('');
   const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
   const [questionText, setQuestionText] = useState('');
+  const [questionSearchTerm, setQuestionSearchTerm] = useState('');
   const [questionAnswerText, setQuestionAnswerText] = useState('');
   const [questionAnswerSpaceSize, setQuestionAnswerSpaceSize] = useState(
     DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE,
@@ -193,16 +203,37 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     topicsByDiscipline[questionDisciplineId] ?? [];
   const isEditingMode = Boolean(editingQuestionId);
 
-  const filteredQuestions = useMemo(() => {
-    if (!selectedDisciplineFilterId) {
-      return questions;
+  const filteredDisciplines = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(disciplineSearchTerm);
+
+    if (!normalizedSearch) {
+      return disciplines;
     }
+
+    return disciplines.filter((discipline) =>
+      normalizeSearchText(discipline.name).includes(normalizedSearch),
+    );
+  }, [disciplines, disciplineSearchTerm]);
+
+  const filteredQuestions = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(questionSearchTerm);
 
     return questions.filter((question) => {
       const topic = topicById[question.topicId];
-      return topic?.disciplineId === selectedDisciplineFilterId;
+      const matchesDiscipline =
+        !selectedDisciplineFilterId ||
+        topic?.disciplineId === selectedDisciplineFilterId;
+      const matchesTitle =
+        !normalizedSearch ||
+        normalizeSearchText(question.text).includes(normalizedSearch);
+
+      return matchesDiscipline && matchesTitle;
     });
-  }, [questions, selectedDisciplineFilterId, topicById]);
+  }, [questions, questionSearchTerm, selectedDisciplineFilterId, topicById]);
+
+  const hasQuestionFilters = Boolean(
+    selectedDisciplineFilterId || normalizeSearchText(questionSearchTerm),
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -844,10 +875,24 @@ export default function QuestionsPage({ token, onUnauthorized }) {
             </button>
           </div>
 
+          <label className="search-field" htmlFor="discipline-search">
+            <span>Buscar disciplina pelo título</span>
+            <input
+              id="discipline-search"
+              type="search"
+              value={disciplineSearchTerm}
+              onChange={(event) => setDisciplineSearchTerm(event.target.value)}
+              placeholder="Digite o nome da disciplina"
+            />
+          </label>
+
           {disciplines.length === 0 ? <p>Nenhuma disciplina cadastrada.</p> : null}
+          {disciplines.length > 0 && filteredDisciplines.length === 0 ? (
+            <p>Nenhuma disciplina encontrada.</p>
+          ) : null}
 
           <div className="kanban-list">
-            {disciplines.map((discipline) => {
+            {filteredDisciplines.map((discipline) => {
               const topicsForDiscipline = topicsByDiscipline[discipline.id] ?? [];
 
               return (
@@ -906,8 +951,25 @@ export default function QuestionsPage({ token, onUnauthorized }) {
             </button>
           </div>
 
+          <label className="search-field" htmlFor="question-search">
+            <span>Buscar questão pelo título</span>
+            <input
+              id="question-search"
+              type="search"
+              value={questionSearchTerm}
+              onChange={(event) => setQuestionSearchTerm(event.target.value)}
+              placeholder="Digite o texto da questão"
+            />
+          </label>
+
           {filteredQuestions.length === 0 ? (
-            <p>Nenhuma questão cadastrada para a disciplina selecionada.</p>
+            <p>
+              {questions.length === 0
+                ? 'Nenhuma questão cadastrada.'
+                : hasQuestionFilters
+                  ? 'Nenhuma questão encontrada para os filtros atuais.'
+                  : 'Nenhuma questão cadastrada.'}
+            </p>
           ) : null}
 
           <div className="kanban-list">
