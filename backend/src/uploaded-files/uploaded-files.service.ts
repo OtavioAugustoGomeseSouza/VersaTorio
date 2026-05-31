@@ -7,7 +7,7 @@ import { Prisma, UploadedFile } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { randomUUID } from 'crypto';
 import { access, mkdir, unlink, writeFile } from 'fs/promises';
-import { dirname, extname, resolve } from 'path';
+import { dirname, extname, isAbsolute, relative, resolve, sep } from 'path';
 import {
   AuthTokenPayload,
   UserRole,
@@ -60,6 +60,8 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     '.docx',
 };
+
+const STORAGE_KEY_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 @Injectable()
 export class UploadedFilesService {
@@ -133,8 +135,39 @@ export class UploadedFilesService {
     return `${userId}/${randomUUID()}${this.resolveFileExtension(file)}`;
   }
 
+  private parseStorageKeySegments(storageKey: string): string[] {
+    const segments = storageKey.split(/[\\/]/);
+
+    if (
+      storageKey.trim().length === 0 ||
+      isAbsolute(storageKey) ||
+      segments.length === 0 ||
+      segments.some(
+        (segment) =>
+          segment.length === 0 ||
+          segment === '.' ||
+          segment === '..' ||
+          !STORAGE_KEY_SEGMENT_PATTERN.test(segment),
+      )
+    ) {
+      throw new NotFoundException('Uploaded file content not found');
+    }
+
+    return segments;
+  }
+
   private resolveAbsolutePath(storageKey: string): string {
-    return resolve(this.uploadRootDir, storageKey);
+    const storageKeySegments = this.parseStorageKeySegments(storageKey);
+    const absolutePath = this.uploadRootDir.endsWith(sep)
+      ? `${this.uploadRootDir}${storageKeySegments.join(sep)}`
+      : `${this.uploadRootDir}${sep}${storageKeySegments.join(sep)}`;
+    const relativePath = relative(this.uploadRootDir, absolutePath);
+
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+      throw new NotFoundException('Uploaded file content not found');
+    }
+
+    return absolutePath;
   }
 
   private async ensureFileAccess(
