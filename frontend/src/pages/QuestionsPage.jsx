@@ -193,6 +193,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [savingDiscipline, setSavingDiscipline] = useState(false);
   const [savingTopic, setSavingTopic] = useState(false);
   const [savingQuestion, setSavingQuestion] = useState(false);
+  const [deletingDisciplineId, setDeletingDisciplineId] = useState('');
+  const [deletingTopicId, setDeletingTopicId] = useState('');
   const [deletingQuestionId, setDeletingQuestionId] = useState('');
   const [message, setMessage] = useState('');
 
@@ -632,6 +634,86 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
   }
 
+  async function handleDeleteDiscipline(discipline) {
+    const topicsForDiscipline = topicsByDiscipline[discipline.id] ?? [];
+    const relatedQuestionCount = questions.filter((question) => {
+      const topic = topicById[question.topicId];
+      return topic?.disciplineId === discipline.id;
+    }).length;
+
+    const confirmed = window.confirm(
+      `Deseja realmente excluir a disciplina "${discipline.name}"? Isso apagará ${topicsForDiscipline.length} tópico(s), ${relatedQuestionCount} questão(ões), alternativas e provas/versões relacionadas. Esta ação não pode ser desfeita.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingDisciplineId(discipline.id);
+    setMessage('');
+
+    try {
+      await apiRequest(`/disciplines/${discipline.id}`, {
+        method: 'DELETE',
+        token,
+      });
+
+      if (selectedDisciplineFilterId === discipline.id) {
+        setSelectedDisciplineFilterId('');
+      }
+
+      closeAllModals();
+      setMessage('Disciplina excluída com tópicos e questões relacionados');
+      await loadData();
+    } catch (error) {
+      if (error.status === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      setMessage(error.message ?? 'Erro ao excluir disciplina');
+    } finally {
+      setDeletingDisciplineId('');
+    }
+  }
+
+  async function handleDeleteTopic(topic) {
+    const relatedQuestionCount = questions.filter(
+      (question) => question.topicId === topic.id,
+    ).length;
+
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o tópico "${topic.name}"? Isso apagará ${relatedQuestionCount} questão(ões), alternativas e referências relacionadas. Esta ação não pode ser desfeita.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingTopicId(topic.id);
+    setMessage('');
+
+    try {
+      await apiRequest(`/topics/${topic.id}`, {
+        method: 'DELETE',
+        token,
+      });
+
+      closeAllModals();
+      setMessage('Tópico excluído com questões relacionadas');
+      await loadData();
+    } catch (error) {
+      if (error.status === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      setMessage(error.message ?? 'Erro ao excluir tópico');
+    } finally {
+      setDeletingTopicId('');
+    }
+  }
+
   async function handleCreateQuestionWithAlternatives(event) {
     event.preventDefault();
 
@@ -1012,6 +1094,23 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                       >
                         +
                       </button>
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-small danger-btn"
+                        title="Excluir disciplina"
+                        aria-label={`Excluir disciplina ${discipline.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDeleteDiscipline(discipline);
+                        }}
+                        disabled={deletingDisciplineId === discipline.id}
+                      >
+                        {deletingDisciplineId === discipline.id ? (
+                          '...'
+                        ) : (
+                          <TrashIcon className="button-icon" />
+                        )}
+                      </button>
                     </div>
                   </div>
                   <p className="muted">Tópicos: {topicsForDiscipline.length}</p>
@@ -1020,18 +1119,37 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                       {topicsForDiscipline.map((topic) => (
                         <li key={topic.id} className="topic-inline-item">
                           <span>{topic.name}</span>
-                          <button
-                            type="button"
-                            className="icon-btn icon-btn-small topic-edit-btn"
-                            title="Editar tópico"
-                            aria-label={`Editar tópico ${topic.name}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openTopicModalForEdit(topic);
-                            }}
-                          >
-                            <PencilIcon className="button-icon" />
-                          </button>
+                          <div className="topic-actions">
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn-small topic-action-btn topic-edit-btn"
+                              title="Editar tópico"
+                              aria-label={`Editar tópico ${topic.name}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openTopicModalForEdit(topic);
+                              }}
+                            >
+                              <PencilIcon className="button-icon" />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn-small topic-action-btn topic-delete-btn"
+                              title="Excluir tópico"
+                              aria-label={`Excluir tópico ${topic.name}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleDeleteTopic(topic);
+                              }}
+                              disabled={deletingTopicId === topic.id}
+                            >
+                              {deletingTopicId === topic.id ? (
+                                '...'
+                              ) : (
+                                <TrashIcon className="button-icon" />
+                              )}
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

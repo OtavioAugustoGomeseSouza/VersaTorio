@@ -8,5 +8,6 @@ import { UploadedFilesModule } from '../uploaded-files/uploaded-files.module';
   imports: [PrismaModule, UploadedFilesModule],
   providers: [QuestionsService],
   controllers: [QuestionsController],
+  exports: [QuestionsService],
 })
 export class QuestionsModule {}

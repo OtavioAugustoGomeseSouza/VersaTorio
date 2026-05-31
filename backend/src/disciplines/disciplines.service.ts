@@ -6,6 +6,7 @@ import {
 import { CreateDisciplineDto } from './dto/create-discipline.dto';
 import { UpdateDisciplineDto } from './dto/update-discipline.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { QuestionsService } from '../questions/questions.service';
 import { DisciplineEntity } from './entities/discipline.entity';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -15,7 +16,10 @@ import {
 
 @Injectable()
 export class DisciplinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly questionsService: QuestionsService,
+  ) {}
 
   private isAdmin(authUser: AuthTokenPayload): boolean {
     return authUser.role === UserRole.admin;
@@ -97,6 +101,21 @@ export class DisciplinesService {
     authUser: AuthTokenPayload,
   ): Promise<DisciplineEntity> {
     await this.findOne(id, authUser);
+
+    const questions = await this.prisma.question.findMany({
+      where: {
+        topic: {
+          disciplineId: id,
+        },
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    for (const question of questions) {
+      await this.questionsService.remove(question.id, authUser);
+    }
+
     const discipline = await this.prisma.discipline.delete({
       where: { id },
     });

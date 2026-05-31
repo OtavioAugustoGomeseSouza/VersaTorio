@@ -487,11 +487,27 @@ legend {
   height: 14px;
 }
 
-.topic-edit-btn {
+.topic-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.topic-action-btn {
   width: 22px;
   height: 22px;
-  background: var(--surface-muted-alt);
   border: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+.topic-action-btn .button-icon {
+  width: 11px;
+  height: 11px;
+}
+
+.topic-edit-btn {
+  background: var(--surface-muted-alt);
   color: var(--ink-muted);
 }
 
@@ -500,9 +516,15 @@ legend {
   color: var(--primary-soft-text);
 }
 
-.topic-edit-btn .button-icon {
-  width: 11px;
-  height: 11px;
+.topic-delete-btn {
+  background: transparent;
+  border-color: var(--error-border);
+  color: var(--danger);
+}
+
+.topic-delete-btn:hover {
+  background: var(--error-surface);
+  color: var(--danger-strong);
 }
 
 .discipline-item-header {
