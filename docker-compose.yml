@@ -35,14 +35,13 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - backend_uploads:/app/uploads
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - ./backend/uploads:/app/uploads
     command: >
       sh -c "
-      npm ci &&
       npx prisma generate &&
-      npx prisma migrate dev --name init &&
+      npx prisma migrate deploy &&
       npm run start:dev
       "
 
@@ -57,14 +56,10 @@ services:
     ports:
       - "5174:5173"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: >
-      sh -c "
-      npm install &&
-      npm run dev
-      "
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+    command: npm run dev
 
 volumes:
   mysql_data:
-  backend_uploads:
