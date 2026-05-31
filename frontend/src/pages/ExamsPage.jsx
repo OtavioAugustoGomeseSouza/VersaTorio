@@ -137,6 +137,9 @@ export default function ExamsPage({ token, onUnauthorized }) {
     return result;
   }, [questions]);
 
+  const canChooseVersionsCount = shuffleQuestions || shuffleAlternatives;
+  const effectiveVersionsCount = canChooseVersionsCount ? versionsCount : 1;
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setMessage('');
@@ -227,6 +230,12 @@ export default function ExamsPage({ token, onUnauthorized }) {
       return normalizedRules;
     });
   }, [questionSelectionMode, topicsFromSelectedDiscipline]);
+
+  useEffect(() => {
+    if (!canChooseVersionsCount && versionsCount !== 1) {
+      setVersionsCount(1);
+    }
+  }, [canChooseVersionsCount, versionsCount]);
 
   function resetDrawSelection() {
     setSelectedQuestionIds([]);
@@ -367,7 +376,7 @@ export default function ExamsPage({ token, onUnauthorized }) {
           questionIds: selectedQuestionIds,
           shuffleQuestions,
           shuffleAlternatives,
-          versionsCount,
+          versionsCount: effectiveVersionsCount,
         },
       });
       navigate(`/versions?examId=${createdExam.id}`);
@@ -756,7 +765,14 @@ export default function ExamsPage({ token, onUnauthorized }) {
               id="shuffle-questions"
               type="checkbox"
               checked={shuffleQuestions}
-              onChange={(event) => setShuffleQuestions(event.target.checked)}
+              onChange={(event) => {
+                const nextShuffleQuestions = event.target.checked;
+                setShuffleQuestions(nextShuffleQuestions);
+
+                if (!nextShuffleQuestions && !shuffleAlternatives) {
+                  setVersionsCount(1);
+                }
+              }}
             />
             Embaralhar questões
           </label>
@@ -766,7 +782,14 @@ export default function ExamsPage({ token, onUnauthorized }) {
               id="shuffle-alternatives"
               type="checkbox"
               checked={shuffleAlternatives}
-              onChange={(event) => setShuffleAlternatives(event.target.checked)}
+              onChange={(event) => {
+                const nextShuffleAlternatives = event.target.checked;
+                setShuffleAlternatives(nextShuffleAlternatives);
+
+                if (!shuffleQuestions && !nextShuffleAlternatives) {
+                  setVersionsCount(1);
+                }
+              }}
             />
             Embaralhar alternativas
           </label>
@@ -777,8 +800,16 @@ export default function ExamsPage({ token, onUnauthorized }) {
             type="number"
             min={1}
             max={26}
-            value={versionsCount}
-            onChange={(event) => setVersionsCount(Number(event.target.value) || 1)}
+            value={effectiveVersionsCount}
+            onChange={(event) =>
+              setVersionsCount(
+                Math.min(
+                  26,
+                  Math.max(1, Math.floor(Number(event.target.value) || 1)),
+                ),
+              )
+            }
+            disabled={!canChooseVersionsCount}
           />
 
           <p>Questões selecionadas: {selectedQuestions.length}</p>
@@ -787,7 +818,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
             type="submit"
             disabled={saving || selectedQuestionIds.length === 0}
           >
-            {saving ? 'Salvando...' : 'Criar prova e gerar versões'}
+            {saving
+              ? 'Salvando...'
+              : canChooseVersionsCount
+                ? 'Criar prova e gerar versões'
+                : 'Criar prova e gerar versão'}
           </button>
         </form>
       </section>

@@ -92,6 +92,18 @@ export class ExamsService {
     return this.shuffleArray(alternatives);
   }
 
+  private normalizeVersionsCount(
+    shuffleQuestions: boolean,
+    shuffleAlternatives: boolean,
+    versionsCount: number,
+  ): number {
+    if (!shuffleQuestions && !shuffleAlternatives) {
+      return 1;
+    }
+
+    return versionsCount;
+  }
+
   private buildOrderData(
     questions: QuestionForOrder[],
     shuffleAlternatives: boolean,
@@ -239,7 +251,11 @@ export class ExamsService {
 
     const shuffleQuestions = createExamDto.shuffleQuestions ?? true;
     const shuffleAlternatives = createExamDto.shuffleAlternatives ?? true;
-    const versionsCount = createExamDto.versionsCount ?? 1;
+    const versionsCount = this.normalizeVersionsCount(
+      shuffleQuestions,
+      shuffleAlternatives,
+      createExamDto.versionsCount ?? 1,
+    );
 
     const exam = await this.prisma.$transaction(async (tx) => {
       const createdExam = await tx.exam.create({
@@ -422,7 +438,16 @@ export class ExamsService {
     updateExamDto: UpdateExamDto,
     authUser: AuthTokenPayload,
   ): Promise<ExamEntity> {
-    await this.findOne(id, authUser);
+    const currentExam = await this.findOne(id, authUser);
+    const shuffleQuestions =
+      updateExamDto.shuffleQuestions ?? currentExam.shuffleQuestions;
+    const shuffleAlternatives =
+      updateExamDto.shuffleAlternatives ?? currentExam.shuffleAlternatives;
+    const versionsCountDefault = this.normalizeVersionsCount(
+      shuffleQuestions,
+      shuffleAlternatives,
+      updateExamDto.versionsCountDefault ?? currentExam.versionsCountDefault,
+    );
 
     const exam = await this.prisma.exam.update({
       where: { id },
@@ -431,7 +456,7 @@ export class ExamsService {
         description: updateExamDto.description,
         shuffleQuestions: updateExamDto.shuffleQuestions,
         shuffleAlternatives: updateExamDto.shuffleAlternatives,
-        versionsCountDefault: updateExamDto.versionsCountDefault,
+        versionsCountDefault,
       },
     });
     return plainToInstance(ExamEntity, exam);
