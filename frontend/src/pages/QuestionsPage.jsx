@@ -136,6 +136,22 @@ function TrashIcon({ className = '' }) {
   );
 }
 
+function PencilIcon({ className = '' }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      focusable="false"
+    >
+      <path
+        d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25zm15.71-10.04a1 1 0 0 0 0-1.41L18.2 4.29a1 1 0 0 0-1.41 0l-1.03 1.03 2.75 2.75 1.2-.86z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export default function QuestionsPage({ token, onUnauthorized }) {
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
@@ -150,6 +166,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [disciplineInitialTopicName, setDisciplineInitialTopicName] = useState('');
   const [topicName, setTopicName] = useState('');
   const [topicDisciplineId, setTopicDisciplineId] = useState('');
+  const [editingDisciplineId, setEditingDisciplineId] = useState('');
+  const [editingTopicId, setEditingTopicId] = useState('');
   const [selectedDisciplineFilterId, setSelectedDisciplineFilterId] = useState('');
   const [disciplineSearchTerm, setDisciplineSearchTerm] = useState('');
 
@@ -202,6 +220,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const topicsFromQuestionDiscipline =
     topicsByDiscipline[questionDisciplineId] ?? [];
   const isEditingMode = Boolean(editingQuestionId);
+  const isEditingDiscipline = Boolean(editingDisciplineId);
+  const isEditingTopic = Boolean(editingTopicId);
 
   const filteredDisciplines = useMemo(() => {
     const normalizedSearch = normalizeSearchText(disciplineSearchTerm);
@@ -288,7 +308,16 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   }, [disciplines, selectedDisciplineFilterId]);
 
   function openDisciplineModal() {
+    setEditingDisciplineId('');
     setDisciplineName('');
+    setCreateTopicWithDiscipline(false);
+    setDisciplineInitialTopicName('');
+    setShowDisciplineModal(true);
+  }
+
+  function openDisciplineModalForEdit(discipline) {
+    setEditingDisciplineId(discipline.id);
+    setDisciplineName(discipline.name ?? '');
     setCreateTopicWithDiscipline(false);
     setDisciplineInitialTopicName('');
     setShowDisciplineModal(true);
@@ -299,8 +328,16 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       return;
     }
 
+    setEditingTopicId('');
     setTopicName('');
     setTopicDisciplineId(disciplineId);
+    setShowTopicModal(true);
+  }
+
+  function openTopicModalForEdit(topic) {
+    setEditingTopicId(topic.id);
+    setTopicName(topic.name ?? '');
+    setTopicDisciplineId(topic.disciplineId);
     setShowTopicModal(true);
   }
 
@@ -401,6 +438,8 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setShowDisciplineModal(false);
     setShowTopicModal(false);
     setShowQuestionModal(false);
+    setEditingDisciplineId('');
+    setEditingTopicId('');
   }
 
   function handleQuestionDisciplineChange(nextDisciplineId) {
@@ -475,39 +514,55 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     );
   }
 
-  async function handleCreateDiscipline(event) {
+  async function handleSaveDiscipline(event) {
     event.preventDefault();
 
     if (!disciplineName.trim()) {
       return;
     }
 
+    const isEditing = Boolean(editingDisciplineId);
+    const normalizedName = disciplineName.trim();
+
     setSavingDiscipline(true);
     setMessage('');
 
     try {
-      const createdDiscipline = await apiRequest('/disciplines', {
-        method: 'POST',
-        token,
-        body: {
-          name: disciplineName.trim(),
-        },
-      });
-
-      if (createTopicWithDiscipline && disciplineInitialTopicName.trim()) {
-        await apiRequest(`/disciplines/${createdDiscipline.id}/topics`, {
+      if (isEditing) {
+        await apiRequest(`/disciplines/${editingDisciplineId}`, {
+          method: 'PATCH',
+          token,
+          body: {
+            name: normalizedName,
+          },
+        });
+      } else {
+        const createdDiscipline = await apiRequest('/disciplines', {
           method: 'POST',
           token,
           body: {
-            name: disciplineInitialTopicName.trim(),
+            name: normalizedName,
           },
         });
+
+        if (createTopicWithDiscipline && disciplineInitialTopicName.trim()) {
+          await apiRequest(`/disciplines/${createdDiscipline.id}/topics`, {
+            method: 'POST',
+            token,
+            body: {
+              name: disciplineInitialTopicName.trim(),
+            },
+          });
+        }
+
+        setSelectedDisciplineFilterId(createdDiscipline.id);
       }
 
       closeAllModals();
-      setSelectedDisciplineFilterId(createdDiscipline.id);
       setMessage(
-        createTopicWithDiscipline && disciplineInitialTopicName.trim()
+        isEditing
+          ? 'Disciplina atualizada com sucesso'
+          : createTopicWithDiscipline && disciplineInitialTopicName.trim()
           ? 'Disciplina e tópico criados com sucesso'
           : 'Disciplina criada com sucesso',
       );
@@ -517,40 +572,61 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar disciplina');
+      setMessage(
+        error.message ??
+          (isEditing ? 'Erro ao atualizar disciplina' : 'Erro ao criar disciplina'),
+      );
     } finally {
       setSavingDiscipline(false);
     }
   }
 
-  async function handleCreateTopic(event) {
+  async function handleSaveTopic(event) {
     event.preventDefault();
 
     if (!topicDisciplineId || !topicName.trim()) {
       return;
     }
 
+    const isEditing = Boolean(editingTopicId);
+    const normalizedName = topicName.trim();
+
     setSavingTopic(true);
     setMessage('');
 
     try {
-      await apiRequest(`/disciplines/${topicDisciplineId}/topics`, {
-        method: 'POST',
-        token,
-        body: {
-          name: topicName.trim(),
-        },
-      });
+      if (isEditing) {
+        await apiRequest(`/topics/${editingTopicId}`, {
+          method: 'PATCH',
+          token,
+          body: {
+            name: normalizedName,
+          },
+        });
+      } else {
+        await apiRequest(`/disciplines/${topicDisciplineId}/topics`, {
+          method: 'POST',
+          token,
+          body: {
+            name: normalizedName,
+          },
+        });
+      }
 
       closeAllModals();
-      setMessage('Tópico criado com sucesso');
+      setMessage(
+        isEditing ? 'Tópico atualizado com sucesso' : 'Tópico criado com sucesso',
+      );
       await loadData();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar tópico');
+      setMessage(
+        error.message ??
+          (isEditing ? 'Erro ao atualizar tópico' : 'Erro ao criar tópico'),
+      );
     } finally {
       setSavingTopic(false);
     }
@@ -911,22 +987,52 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 >
                   <div className="discipline-item-header">
                     <h3>{discipline.name}</h3>
-                    <button
-                      type="button"
-                      className="icon-btn icon-btn-small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openTopicModalForDiscipline(discipline.id);
-                      }}
-                    >
-                      +
-                    </button>
+                    <div className="entity-actions">
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-small"
+                        title="Editar disciplina"
+                        aria-label={`Editar disciplina ${discipline.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openDisciplineModalForEdit(discipline);
+                        }}
+                      >
+                        <PencilIcon className="button-icon" />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-small"
+                        title="Criar tópico"
+                        aria-label={`Criar tópico em ${discipline.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openTopicModalForDiscipline(discipline.id);
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <p className="muted">Tópicos: {topicsForDiscipline.length}</p>
                   {topicsForDiscipline.length > 0 ? (
                     <ul className="topic-inline-list">
                       {topicsForDiscipline.map((topic) => (
-                        <li key={topic.id}>{topic.name}</li>
+                        <li key={topic.id} className="topic-inline-item">
+                          <span>{topic.name}</span>
+                          <button
+                            type="button"
+                            className="icon-btn icon-btn-small topic-edit-btn"
+                            title="Editar tópico"
+                            aria-label={`Editar tópico ${topic.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openTopicModalForEdit(topic);
+                            }}
+                          >
+                            <PencilIcon className="button-icon" />
+                          </button>
+                        </li>
                       ))}
                     </ul>
                   ) : (
@@ -1069,13 +1175,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         <div className="modal-overlay" onClick={closeAllModals}>
           <section className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Nova disciplina</h2>
+              <h2>{isEditingDiscipline ? 'Editar disciplina' : 'Nova disciplina'}</h2>
               <button type="button" className="ghost-btn" onClick={closeAllModals}>
                 Fechar
               </button>
             </div>
 
-            <form onSubmit={handleCreateDiscipline} className="form-grid">
+            <form onSubmit={handleSaveDiscipline} className="form-grid">
               <label htmlFor="modal-discipline-name">Nome</label>
               <input
                 id="modal-discipline-name"
@@ -1085,37 +1191,43 @@ export default function QuestionsPage({ token, onUnauthorized }) {
                 required
               />
 
-              <div className="spotlight-block">
-                <label className="checkbox-label" htmlFor="create-topic-with-discipline">
-                  <input
-                    id="create-topic-with-discipline"
-                    type="checkbox"
-                    checked={createTopicWithDiscipline}
-                    onChange={(event) =>
-                      setCreateTopicWithDiscipline(event.target.checked)
-                    }
-                  />
-                  Também criar um tópico agora
-                </label>
-
-                {createTopicWithDiscipline ? (
-                  <label htmlFor="modal-discipline-initial-topic">
-                    Primeiro tópico
+              {!isEditingDiscipline ? (
+                <div className="spotlight-block">
+                  <label className="checkbox-label" htmlFor="create-topic-with-discipline">
                     <input
-                      id="modal-discipline-initial-topic"
-                      type="text"
-                      value={disciplineInitialTopicName}
+                      id="create-topic-with-discipline"
+                      type="checkbox"
+                      checked={createTopicWithDiscipline}
                       onChange={(event) =>
-                        setDisciplineInitialTopicName(event.target.value)
+                        setCreateTopicWithDiscipline(event.target.checked)
                       }
-                      placeholder="Ex.: Introdução"
                     />
+                    Também criar um tópico agora
                   </label>
-                ) : null}
-              </div>
+
+                  {createTopicWithDiscipline ? (
+                    <label htmlFor="modal-discipline-initial-topic">
+                      Primeiro tópico
+                      <input
+                        id="modal-discipline-initial-topic"
+                        type="text"
+                        value={disciplineInitialTopicName}
+                        onChange={(event) =>
+                          setDisciplineInitialTopicName(event.target.value)
+                        }
+                        placeholder="Ex.: Introdução"
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
 
               <button type="submit" disabled={savingDiscipline}>
-                {savingDiscipline ? 'Salvando...' : 'Criar disciplina'}
+                {savingDiscipline
+                  ? 'Salvando...'
+                  : isEditingDiscipline
+                    ? 'Salvar disciplina'
+                    : 'Criar disciplina'}
               </button>
             </form>
           </section>
@@ -1126,13 +1238,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         <div className="modal-overlay" onClick={closeAllModals}>
           <section className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Novo tópico</h2>
+              <h2>{isEditingTopic ? 'Editar tópico' : 'Novo tópico'}</h2>
               <button type="button" className="ghost-btn" onClick={closeAllModals}>
                 Fechar
               </button>
             </div>
 
-            <form onSubmit={handleCreateTopic} className="form-grid">
+            <form onSubmit={handleSaveTopic} className="form-grid">
               <label htmlFor="modal-topic-discipline">Disciplina</label>
               <input
                 id="modal-topic-discipline"
@@ -1151,7 +1263,11 @@ export default function QuestionsPage({ token, onUnauthorized }) {
               />
 
               <button type="submit" disabled={savingTopic}>
-                {savingTopic ? 'Salvando...' : 'Criar tópico'}
+                {savingTopic
+                  ? 'Salvando...'
+                  : isEditingTopic
+                    ? 'Salvar tópico'
+                    : 'Criar tópico'}
               </button>
             </form>
           </section>

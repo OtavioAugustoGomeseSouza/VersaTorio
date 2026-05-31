@@ -487,11 +487,41 @@ legend {
   height: 14px;
 }
 
+.topic-edit-btn {
+  width: 22px;
+  height: 22px;
+  background: var(--surface-muted-alt);
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+
+.topic-edit-btn:hover {
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+
+.topic-edit-btn .button-icon {
+  width: 11px;
+  height: 11px;
+}
+
 .discipline-item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.6rem;
+}
+
+.discipline-item-header h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entity-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
 }
 
 .discipline-card {
@@ -514,9 +544,23 @@ legend {
 
 .topic-inline-list {
   margin: 0;
-  padding-left: 1rem;
   display: grid;
-  gap: 0.2rem;
+  gap: 0.3rem;
+  list-style: none;
+  padding-left: 0;
+}
+
+.topic-inline-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-height: 28px;
+}
+
+.topic-inline-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .spotlight-block {
