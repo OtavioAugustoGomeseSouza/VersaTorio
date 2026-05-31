@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-05-21T13:15:24.060Z",
+  "password": "perf123",
+  "notes": [
+    "Use professorEmail para testar listagem de questoes, filtro por topico, geracao de versoes e geracao de PDF.",
+    "Use loginUserEmail quando quiser medir login em um cenario com a quantidade correspondente de usuarios de teste.",
+    "Este seed apaga somente usuarios com email @perf.local antes de recriar os dados."
+  ],
+  "scenarios": [
+    {
+      "count": 100,
+      "professorEmail": "professor-100@perf.local",
+      "password": "perf123",
+      "disciplineId": "e312eac2-e179-453a-991e-294c7169d7e6",
+      "topicId": "0e933f01-c6c2-4aa7-8ba2-a86d742a0906",
+      "examId": "6ee437f8-71ed-426e-afbf-8c5d8314267a",
+      "versionId": "387d8802-ec4c-45be-bb7b-0515d3ef2cd2",
+      "questionCount": 100,
+      "loginUserEmail": "login-100-100@perf.local"
+    }
+  ]
+}
