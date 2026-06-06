@@ -43,7 +43,7 @@ export async function apiRequest(path, options = {}) {
       : data?.message;
 
     const error = new Error(
-      backendMessage ?? `Request failed (${response.status})`,
+      backendMessage ?? `Falha na requisição (${response.status})`,
     );
     error.status = response.status;
     error.data = data;
@@ -77,7 +77,7 @@ export async function apiUploadFile(path, { token = '', file, fieldName = 'file'
       : data?.message;
 
     const error = new Error(
-      backendMessage ?? `Request failed (${response.status})`,
+      backendMessage ?? `Falha na requisição (${response.status})`,
     );
     error.status = response.status;
     error.data = data;

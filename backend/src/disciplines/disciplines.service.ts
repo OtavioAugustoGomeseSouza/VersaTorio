@@ -34,7 +34,7 @@ export class DisciplinesService {
     });
     if (existingDiscipline) {
       throw new ConflictException(
-        `Discipline with name "${createDisciplineDto.name}" already exists`,
+        `Disciplina com nome "${createDisciplineDto.name}" já existe`,
       );
     }
 
@@ -62,7 +62,7 @@ export class DisciplinesService {
       !discipline ||
       (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Discipline with ID ${id} not found`);
+      throw new NotFoundException(`Disciplina com ID ${id} não encontrada`);
     }
     return plainToInstance(DisciplineEntity, discipline);
   }
@@ -84,7 +84,7 @@ export class DisciplinesService {
       });
       if (existingDiscipline) {
         throw new ConflictException(
-          `Discipline with name "${updateDisciplineDto.name}" already exists`,
+          `Disciplina com nome "${updateDisciplineDto.name}" já existe`,
         );
       }
     }

@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import AppLink from '../components/AppLink';
+import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 import { navigate } from '../lib/router';
 
 export default function RegisterPage({ onAuthenticated }) {
+  const { notify } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true);
-    setMessage('');
 
     try {
       const response = await apiRequest('/auth/register', {
@@ -26,13 +26,13 @@ export default function RegisterPage({ onAuthenticated }) {
       });
 
       if (!response?.access_token) {
-        throw new Error('Token de acesso nao retornado pelo backend');
+        throw new Error('Token de acesso não retornado pelo backend');
       }
 
       onAuthenticated(response.access_token);
       navigate('/dashboard');
     } catch (error) {
-      setMessage(error.message ?? 'Falha ao cadastrar usuario');
+      notify(error.message ?? 'Falha ao cadastrar usuário', 'error');
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,7 @@ export default function RegisterPage({ onAuthenticated }) {
     <main className="auth-page">
       <section className="auth-card">
         <h1>Criar conta</h1>
-        <p className="muted">Cadastre-se para criar disciplinas, questoes e provas.</p>
+        <p className="muted">Cadastre-se para criar disciplinas, questões e provas.</p>
 
         <form onSubmit={handleSubmit} className="form-grid">
           <label htmlFor="register-name">Nome (opcional)</label>
@@ -53,7 +53,7 @@ export default function RegisterPage({ onAuthenticated }) {
             onChange={(event) => setName(event.target.value)}
           />
 
-          <label htmlFor="register-email">Email</label>
+          <label htmlFor="register-email">E-mail</label>
           <input
             id="register-email"
             type="email"
@@ -77,10 +77,8 @@ export default function RegisterPage({ onAuthenticated }) {
           </button>
         </form>
 
-        {message ? <p className="feedback error">{message}</p> : null}
-
         <p className="inline-tip">
-          Ja possui conta? <AppLink to="/login">Entrar</AppLink>
+          Já possui conta? <AppLink to="/login">Entrar</AppLink>
         </p>
       </section>
     </main>

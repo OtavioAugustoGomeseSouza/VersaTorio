@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { API_URL, apiRequest, apiUploadFile } from '../lib/api';
 import { appConfig } from '../lib/app-config';
 
@@ -87,7 +88,7 @@ function AuthenticatedImage({ token, fileId, alt, className }) {
         });
 
         if (!response.ok) {
-          throw new Error(`Image request failed (${response.status})`);
+          throw new Error(`Falha ao carregar imagem (${response.status})`);
         }
 
         const imageBlob = await response.blob();
@@ -153,6 +154,7 @@ function PencilIcon({ className = '' }) {
 }
 
 export default function QuestionsPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
   const [questions, setQuestions] = useState([]);
@@ -196,7 +198,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
   const [deletingDisciplineId, setDeletingDisciplineId] = useState('');
   const [deletingTopicId, setDeletingTopicId] = useState('');
   const [deletingQuestionId, setDeletingQuestionId] = useState('');
-  const [message, setMessage] = useState('');
 
   const allTopics = useMemo(
     () => Object.values(topicsByDiscipline).flat(),
@@ -259,7 +260,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setMessage('');
 
     try {
       const [disciplinesData, questionsData] = await Promise.all([
@@ -285,11 +285,11 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar banco de questões');
+      notify(error.message ?? 'Erro ao carregar banco de questões', 'error');
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, notify]);
 
   useEffect(() => {
     loadData();
@@ -381,7 +381,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     const topicDisciplineId = topic?.disciplineId;
 
     if (!topicDisciplineId) {
-      setMessage('Não foi possível localizar a disciplina da questão');
+      notify('Não foi possível localizar a disciplina da questão', 'error');
       return;
     }
 
@@ -527,7 +527,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     const normalizedName = disciplineName.trim();
 
     setSavingDiscipline(true);
-    setMessage('');
 
     try {
       if (isEditing) {
@@ -561,12 +560,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       }
 
       closeAllModals();
-      setMessage(
+      notify(
         isEditing
           ? 'Disciplina atualizada com sucesso'
           : createTopicWithDiscipline && disciplineInitialTopicName.trim()
           ? 'Disciplina e tópico criados com sucesso'
           : 'Disciplina criada com sucesso',
+        'success',
       );
       await loadData();
     } catch (error) {
@@ -574,9 +574,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(
+      notify(
         error.message ??
           (isEditing ? 'Erro ao atualizar disciplina' : 'Erro ao criar disciplina'),
+        'error',
       );
     } finally {
       setSavingDiscipline(false);
@@ -594,7 +595,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     const normalizedName = topicName.trim();
 
     setSavingTopic(true);
-    setMessage('');
 
     try {
       if (isEditing) {
@@ -616,8 +616,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       }
 
       closeAllModals();
-      setMessage(
+      notify(
         isEditing ? 'Tópico atualizado com sucesso' : 'Tópico criado com sucesso',
+        'success',
       );
       await loadData();
     } catch (error) {
@@ -625,9 +626,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(
+      notify(
         error.message ??
           (isEditing ? 'Erro ao atualizar tópico' : 'Erro ao criar tópico'),
+        'error',
       );
     } finally {
       setSavingTopic(false);
@@ -650,7 +652,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
 
     setDeletingDisciplineId(discipline.id);
-    setMessage('');
 
     try {
       await apiRequest(`/disciplines/${discipline.id}`, {
@@ -663,7 +664,10 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       }
 
       closeAllModals();
-      setMessage('Disciplina excluída com tópicos e questões relacionados');
+      notify(
+        'Disciplina excluída com tópicos e questões relacionados',
+        'success',
+      );
       await loadData();
     } catch (error) {
       if (error.status === 401) {
@@ -671,7 +675,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         return;
       }
 
-      setMessage(error.message ?? 'Erro ao excluir disciplina');
+      notify(error.message ?? 'Erro ao excluir disciplina', 'error');
     } finally {
       setDeletingDisciplineId('');
     }
@@ -691,7 +695,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
 
     setDeletingTopicId(topic.id);
-    setMessage('');
 
     try {
       await apiRequest(`/topics/${topic.id}`, {
@@ -700,7 +703,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       });
 
       closeAllModals();
-      setMessage('Tópico excluído com questões relacionadas');
+      notify('Tópico excluído com questões relacionadas', 'success');
       await loadData();
     } catch (error) {
       if (error.status === 401) {
@@ -708,7 +711,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         return;
       }
 
-      setMessage(error.message ?? 'Erro ao excluir tópico');
+      notify(error.message ?? 'Erro ao excluir tópico', 'error');
     } finally {
       setDeletingTopicId('');
     }
@@ -736,12 +739,15 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
     if (!isMultipleChoice) {
       if (!normalizedAnswerText) {
-        setMessage('Para questão dissertativa, informe a resposta');
+        notify('Para questão dissertativa, informe a resposta', 'error');
         return;
       }
 
       if (!questionAnswerSpaceSize) {
-        setMessage('Selecione o tamanho de espaço para a questão dissertativa');
+        notify(
+          'Selecione o tamanho de espaço para a questão dissertativa',
+          'error',
+        );
         return;
       }
     }
@@ -769,7 +775,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       : [];
 
     if (isMultipleChoice && alternativesPayload.length < 2) {
-      setMessage('Adicione ao menos 2 alternativas com texto ou imagem');
+      notify('Adicione ao menos 2 alternativas com texto ou imagem', 'error');
       return;
     }
 
@@ -778,7 +784,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     ).length;
 
     if (isMultipleChoice && correctCount < 1) {
-      setMessage('Marque ao menos 1 alternativa correta');
+      notify('Marque ao menos 1 alternativa correta', 'error');
       return;
     }
 
@@ -790,12 +796,11 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     );
 
     if (isMultipleChoice && invalidImageAlternative) {
-      setMessage('Alternativas de imagem precisam de arquivo');
+      notify('Alternativas de imagem precisam de arquivo', 'error');
       return;
     }
 
     setSavingQuestion(true);
-    setMessage('');
 
     let savedQuestionId = editingQuestionId;
     const uploadedFileIds = [];
@@ -849,7 +854,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       }
 
       if (!savedQuestionId) {
-        throw new Error('Question id is required after save');
+        throw new Error('ID da questão é obrigatório após salvar');
       }
 
       if (isMultipleChoice) {
@@ -927,12 +932,13 @@ export default function QuestionsPage({ token, onUnauthorized }) {
       }
 
       closeAllModals();
-      setMessage(
+      notify(
         isEditingMode
           ? 'Questão atualizada com sucesso'
           : isMultipleChoice
             ? 'Questão e alternativas criadas com sucesso'
             : 'Questão dissertativa criada com sucesso',
+        'success',
       );
       await loadData();
     } catch (error) {
@@ -962,11 +968,12 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(
+      notify(
         error.message ??
           (isEditingMode
             ? 'Erro ao atualizar questão'
             : 'Erro ao criar questão com alternativas'),
+        'error',
       );
     } finally {
       setSavingQuestion(false);
@@ -983,7 +990,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     }
 
     setDeletingQuestionId(question.id);
-    setMessage('');
 
     try {
       await apiRequest(`/questions/${question.id}`, {
@@ -996,7 +1002,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         resetQuestionModalState();
       }
 
-      setMessage('Questão excluída com sucesso');
+      notify('Questão excluída com sucesso', 'success');
       await loadData();
     } catch (error) {
       if (error.status === 401) {
@@ -1004,7 +1010,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
         return;
       }
 
-      setMessage(error.message ?? 'Erro ao excluir questão');
+      notify(error.message ?? 'Erro ao excluir questão', 'error');
     } finally {
       setDeletingQuestionId('');
     }
@@ -1019,8 +1025,6 @@ export default function QuestionsPage({ token, onUnauthorized }) {
           tópicos dela. Clique em uma questão para editar.
         </p>
       </header>
-
-      {message ? <p className="feedback">{message}</p> : null}
 
       {loading ? <p>Carregando...</p> : null}
 

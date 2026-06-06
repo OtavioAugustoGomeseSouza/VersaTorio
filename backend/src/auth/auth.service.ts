@@ -18,7 +18,7 @@ export class AuthService {
 
   async register(dto: CreateUserDto) {
     const existing = await this.users.findByEmail(dto.email);
-    if (existing) throw new ConflictException('Email já cadastrado');
+    if (existing) throw new ConflictException('E-mail já cadastrado');
 
     const hash = await bcrypt.hash(dto.password, 12);
 

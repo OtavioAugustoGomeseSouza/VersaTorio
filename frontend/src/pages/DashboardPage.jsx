@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 
 export default function DashboardPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [metrics, setMetrics] = useState({
     disciplines: 0,
     topics: 0,
@@ -17,7 +18,6 @@ export default function DashboardPage({ token, onUnauthorized }) {
 
     async function loadData() {
       setLoading(true);
-      setError('');
 
       try {
         const [disciplines, questions, exams, versions] = await Promise.all([
@@ -56,7 +56,7 @@ export default function DashboardPage({ token, onUnauthorized }) {
         }
 
         if (active) {
-          setError(requestError.message ?? 'Erro ao carregar dashboard');
+          notify(requestError.message ?? 'Erro ao carregar dashboard', 'error');
         }
       } finally {
         if (active) {
@@ -70,7 +70,7 @@ export default function DashboardPage({ token, onUnauthorized }) {
     return () => {
       active = false;
     };
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, notify]);
 
   if (loading) {
     return <p>Carregando dashboard...</p>;
@@ -82,8 +82,6 @@ export default function DashboardPage({ token, onUnauthorized }) {
         <h1>Dashboard</h1>
         <p className="muted">Visão geral das entidades principais do sistema.</p>
       </header>
-
-      {error ? <p className="feedback error">{error}</p> : null}
 
       <section className="stats-grid">
         <article className="stat-card">

@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 
 export default function DisciplinesPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [disciplines, setDisciplines] = useState([]);
   const [topicCountByDiscipline, setTopicCountByDiscipline] = useState({});
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
 
   const loadDisciplines = useCallback(async () => {
     setLoading(true);
-    setMessage('');
 
     try {
       const data = await apiRequest('/disciplines', { token });
@@ -33,11 +33,11 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar disciplinas');
+      notify(error.message ?? 'Erro ao carregar disciplinas', 'error');
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, notify]);
 
   useEffect(() => {
     loadDisciplines();
@@ -50,7 +50,6 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
     }
 
     setSaving(true);
-    setMessage('');
 
     try {
       await apiRequest('/disciplines', {
@@ -59,14 +58,14 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
         body: { name: name.trim() },
       });
       setName('');
-      setMessage('Disciplina criada com sucesso');
+      notify('Disciplina criada com sucesso', 'success');
       await loadDisciplines();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar disciplina');
+      notify(error.message ?? 'Erro ao criar disciplina', 'error');
     } finally {
       setSaving(false);
     }
@@ -78,21 +77,19 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
       return;
     }
 
-    setMessage('');
-
     try {
       await apiRequest(`/disciplines/${id}`, {
         method: 'DELETE',
         token,
       });
-      setMessage('Disciplina removida');
+      notify('Disciplina removida', 'success');
       await loadDisciplines();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao remover disciplina');
+      notify(error.message ?? 'Erro ao remover disciplina', 'error');
     }
   }
 
@@ -100,7 +97,7 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
     <div className="page-grid">
       <header>
         <h1>Disciplinas</h1>
-        <p className="muted">Crie e gerencie as disciplinas principais do banco de questoes.</p>
+        <p className="muted">Crie e gerencie as disciplinas principais do banco de questões.</p>
       </header>
 
       <section className="card">
@@ -120,8 +117,6 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
         </form>
       </section>
 
-      {message ? <p className="feedback">{message}</p> : null}
-
       <section className="card">
         <h2>Lista de disciplinas</h2>
         {loading ? <p>Carregando...</p> : null}
@@ -135,7 +130,7 @@ export default function DisciplinesPage({ token, onUnauthorized }) {
             <thead>
               <tr>
                 <th>Nome</th>
-                <th>Topicos</th>
+                <th>Tópicos</th>
                 <th>Criada em</th>
                 <th>Acoes</th>
               </tr>

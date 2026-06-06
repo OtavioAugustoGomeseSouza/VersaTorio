@@ -122,7 +122,7 @@ export class ExamVersionsService {
     });
 
     if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
-      throw new NotFoundException('Exam not found');
+      throw new NotFoundException('Prova não encontrada');
     }
 
     return exam;
@@ -177,7 +177,9 @@ export class ExamVersionsService {
       !examVersion ||
       (!this.isAdmin(authUser) && examVersion.exam.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Exam version with ID ${id} not found`);
+      throw new NotFoundException(
+        `Versão de prova com ID ${id} não encontrada`,
+      );
     }
 
     return examVersion;
@@ -189,7 +191,7 @@ export class ExamVersionsService {
   ): void {
     if (exam.examQuestions.length === 0) {
       throw new BadRequestException(
-        'Cannot generate exam version without questions',
+        'Não é possível gerar uma versão de prova sem questões',
       );
     }
 
@@ -204,13 +206,13 @@ export class ExamVersionsService {
       if (question.type === QuestionType.DISSERTATIVE) {
         if (!question.answerText || !question.answerSpaceSize) {
           throw new BadRequestException(
-            `Question ${question.id} must include answerText and answerSpaceSize for DISSERTATIVE`,
+            `Questão ${question.id} deve incluir resposta e tamanho do espaço de resposta para ser dissertativa`,
           );
         }
 
         if (totalAlternatives > 0) {
           throw new BadRequestException(
-            `Question ${question.id} cannot have alternatives for DISSERTATIVE`,
+            `Questão ${question.id} não pode ter alternativas porque é dissertativa`,
           );
         }
 
@@ -219,19 +221,19 @@ export class ExamVersionsService {
 
       if (totalAlternatives < 2) {
         throw new BadRequestException(
-          `Question ${question.id} must have at least 2 alternatives`,
+          `Questão ${question.id} deve ter pelo menos 2 alternativas`,
         );
       }
 
       if (correctAlternatives < 1) {
         throw new BadRequestException(
-          `Question ${question.id} must have at least 1 correct alternative`,
+          `Questão ${question.id} deve ter pelo menos 1 alternativa correta`,
         );
       }
 
       if (distributeCorrectAlternatives && correctAlternatives !== 1) {
         throw new BadRequestException(
-          `Question ${question.id} must have exactly 1 correct alternative to distribute correct alternatives proportionally`,
+          `Questão ${question.id} deve ter exatamente 1 alternativa correta para distribuir as alternativas corretas proporcionalmente`,
         );
       }
     }
@@ -310,7 +312,9 @@ export class ExamVersionsService {
       Array.isArray(orderData) ||
       !Array.isArray((orderData as { questions?: unknown }).questions)
     ) {
-      throw new BadRequestException('Exam version orderData is invalid');
+      throw new BadRequestException(
+        'Dados de ordenação da versão da prova estão inválidos',
+      );
     }
 
     const questions = (orderData as { questions: unknown[] }).questions.map(
@@ -321,7 +325,7 @@ export class ExamVersionsService {
           Array.isArray(question)
         ) {
           throw new BadRequestException(
-            'Exam version question order is invalid',
+            'Ordem das questões da versão da prova está inválida',
           );
         }
 
@@ -337,7 +341,7 @@ export class ExamVersionsService {
           !Array.isArray(parsedQuestion.alternatives)
         ) {
           throw new BadRequestException(
-            'Exam version question order is invalid',
+            'Ordem das questões da versão da prova está inválida',
           );
         }
 
@@ -348,7 +352,7 @@ export class ExamVersionsService {
             Array.isArray(alternative)
           ) {
             throw new BadRequestException(
-              'Exam version alternative order is invalid',
+              'Ordem das alternativas da versão da prova está inválida',
             );
           }
 
@@ -362,7 +366,7 @@ export class ExamVersionsService {
             typeof parsedAlternative.position !== 'number'
           ) {
             throw new BadRequestException(
-              'Exam version alternative order is invalid',
+              'Ordem das alternativas da versão da prova está inválida',
             );
           }
 
@@ -418,10 +422,7 @@ export class ExamVersionsService {
           }
 
           return {
-            text: [
-              { text: `${field.label}: `, bold: true },
-              field.value,
-            ],
+            text: [{ text: `${field.label}: `, bold: true }, field.value],
             margin: [6, 6, 6, 6],
           };
         }),
@@ -678,7 +679,7 @@ export class ExamVersionsService {
 
       if (!question) {
         throw new BadRequestException(
-          `Question ${orderedQuestion.questionId} is not linked to this exam`,
+          `Questão ${orderedQuestion.questionId} não está vinculada a esta prova`,
         );
       }
 
@@ -771,7 +772,7 @@ export class ExamVersionsService {
 
         if (!question) {
           throw new BadRequestException(
-            `Question ${orderedQuestion.questionId} is not linked to this exam`,
+            `Questão ${orderedQuestion.questionId} não está vinculada a esta prova`,
           );
         }
 
@@ -955,7 +956,7 @@ export class ExamVersionsService {
 
       if (!question) {
         throw new BadRequestException(
-          `Question ${orderedQuestion.questionId} is not linked to this exam`,
+          `Questão ${orderedQuestion.questionId} não está vinculada a esta prova`,
         );
       }
 
@@ -1131,7 +1132,9 @@ export class ExamVersionsService {
       !examVersion ||
       (!this.isAdmin(authUser) && examVersion.exam.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Exam version with ID ${id} not found`);
+      throw new NotFoundException(
+        `Versão de prova com ID ${id} não encontrada`,
+      );
     }
 
     return examVersion;

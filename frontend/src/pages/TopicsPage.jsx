@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 
 export default function TopicsPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [disciplines, setDisciplines] = useState([]);
   const [selectedDisciplineId, setSelectedDisciplineId] = useState('');
   const [topics, setTopics] = useState([]);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
 
   const loadDisciplines = useCallback(async () => {
     try {
@@ -25,9 +26,9 @@ export default function TopicsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar disciplinas');
+      notify(error.message ?? 'Erro ao carregar disciplinas', 'error');
     }
-  }, [token, onUnauthorized, selectedDisciplineId]);
+  }, [token, onUnauthorized, selectedDisciplineId, notify]);
 
   const loadTopics = useCallback(async () => {
     if (!selectedDisciplineId) {
@@ -36,7 +37,6 @@ export default function TopicsPage({ token, onUnauthorized }) {
     }
 
     setLoading(true);
-    setMessage('');
 
     try {
       const data = await apiRequest(
@@ -49,11 +49,11 @@ export default function TopicsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar topicos');
+      notify(error.message ?? 'Erro ao carregar tópicos', 'error');
     } finally {
       setLoading(false);
     }
-  }, [selectedDisciplineId, token, onUnauthorized]);
+  }, [selectedDisciplineId, token, onUnauthorized, notify]);
 
   useEffect(() => {
     loadDisciplines();
@@ -70,7 +70,6 @@ export default function TopicsPage({ token, onUnauthorized }) {
     }
 
     setSaving(true);
-    setMessage('');
 
     try {
       await apiRequest(`/disciplines/${selectedDisciplineId}/topics`, {
@@ -79,48 +78,46 @@ export default function TopicsPage({ token, onUnauthorized }) {
         body: { name: name.trim() },
       });
       setName('');
-      setMessage('Topico criado com sucesso');
+      notify('Tópico criado com sucesso', 'success');
       await loadTopics();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar topico');
+      notify(error.message ?? 'Erro ao criar tópico', 'error');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDeleteTopic(topicId) {
-    const confirmed = window.confirm('Deseja remover este topico?');
+    const confirmed = window.confirm('Deseja remover este tópico?');
     if (!confirmed) {
       return;
     }
-
-    setMessage('');
 
     try {
       await apiRequest(`/topics/${topicId}`, {
         method: 'DELETE',
         token,
       });
-      setMessage('Topico removido');
+      notify('Tópico removido', 'success');
       await loadTopics();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao remover topico');
+      notify(error.message ?? 'Erro ao remover tópico', 'error');
     }
   }
 
   return (
     <div className="page-grid">
       <header>
-        <h1>Materias / Topicos</h1>
-        <p className="muted">Organize os topicos dentro de cada disciplina.</p>
+        <h1>Matérias / Tópicos</h1>
+        <p className="muted">Organize os tópicos dentro de cada disciplina.</p>
       </header>
 
       <section className="card">
@@ -145,9 +142,9 @@ export default function TopicsPage({ token, onUnauthorized }) {
       </section>
 
       <section className="card">
-        <h2>Novo topico</h2>
+        <h2>Novo tópico</h2>
         <form onSubmit={handleCreateTopic} className="form-grid">
-          <label htmlFor="topic-name">Nome do topico</label>
+          <label htmlFor="topic-name">Nome do tópico</label>
           <input
             id="topic-name"
             type="text"
@@ -160,18 +157,16 @@ export default function TopicsPage({ token, onUnauthorized }) {
             type="submit"
             disabled={saving || disciplines.length === 0 || !selectedDisciplineId}
           >
-            {saving ? 'Salvando...' : 'Criar topico'}
+            {saving ? 'Salvando...' : 'Criar tópico'}
           </button>
         </form>
       </section>
 
-      {message ? <p className="feedback">{message}</p> : null}
-
       <section className="card">
-        <h2>Lista de topicos</h2>
+        <h2>Lista de tópicos</h2>
         {loading ? <p>Carregando...</p> : null}
 
-        {!loading && topics.length === 0 ? <p>Nenhum topico cadastrado.</p> : null}
+        {!loading && topics.length === 0 ? <p>Nenhum tópico cadastrado.</p> : null}
 
         {!loading && topics.length > 0 ? (
           <table className="table">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from './components/AppShell';
+import { ToastProvider } from './components/ToastProvider';
 import {
   clearStoredToken,
   getStoredToken,
@@ -28,6 +29,14 @@ const protectedRoutes = [
 const publicRoutes = ['/login', '/register'];
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppRoutes />
+    </ToastProvider>
+  );
+}
+
+function AppRoutes() {
   const pathname = usePathname();
   const [token, setToken] = useState(() => getStoredToken());
 

@@ -9,30 +9,34 @@ import {
 } from 'class-validator';
 
 export class UpdateExamDto {
-  @IsString()
+  @IsString({ message: 'Nome da prova deve ser um texto' })
   @IsOptional()
   name?: string;
 
-  @IsString()
+  @IsString({ message: 'Descrição da prova deve ser um texto' })
   @IsOptional()
   description?: string;
 
-  @IsBoolean()
+  @IsBoolean({ message: 'Embaralhar questões deve ser verdadeiro ou falso' })
   @IsOptional()
   shuffleQuestions?: boolean;
 
-  @IsBoolean()
+  @IsBoolean({
+    message: 'Embaralhar alternativas deve ser verdadeiro ou falso',
+  })
   @IsOptional()
   shuffleAlternatives?: boolean;
 
-  @IsBoolean()
+  @IsBoolean({
+    message: 'Distribuir alternativas corretas deve ser verdadeiro ou falso',
+  })
   @IsOptional()
   distributeCorrectAlternatives?: boolean;
 
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(26)
+  @IsInt({ message: 'Quantidade padrão de versões deve ser um número inteiro' })
+  @Min(1, { message: 'Quantidade padrão de versões deve ser no mínimo 1' })
+  @Max(26, { message: 'Quantidade padrão de versões deve ser no máximo 26' })
   @IsOptional()
   versionsCountDefault?: number;
 }

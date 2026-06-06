@@ -38,7 +38,9 @@ export class TopicsService {
       !discipline ||
       (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Discipline with ID ${disciplineId} not found`);
+      throw new NotFoundException(
+        `Disciplina com ID ${disciplineId} não encontrada`,
+      );
     }
 
     return discipline;
@@ -56,7 +58,7 @@ export class TopicsService {
     });
     if (existingTopic) {
       throw new ConflictException(
-        `Topic with name "${createTopicDto.name}" already exists in this discipline`,
+        `Tópico com nome "${createTopicDto.name}" já existe nesta disciplina`,
       );
     }
 
@@ -95,7 +97,7 @@ export class TopicsService {
       !topic ||
       (!this.isAdmin(authUser) && topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Topic with ID ${id} not found`);
+      throw new NotFoundException(`Tópico com ID ${id} não encontrado`);
     }
 
     return plainToInstance(TopicEntity, topic);
@@ -131,7 +133,7 @@ export class TopicsService {
 
     if (duplicateTopic) {
       throw new ConflictException(
-        `Topic with name "${targetName}" already exists in this discipline`,
+        `Tópico com nome "${targetName}" já existe nesta disciplina`,
       );
     }
 

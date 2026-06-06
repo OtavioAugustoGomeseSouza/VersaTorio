@@ -44,7 +44,9 @@ export class AlternativesService {
       (!this.isAdmin(authUser) &&
         question.topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Question with ID ${questionId} not found`);
+      throw new NotFoundException(
+        `Questão com ID ${questionId} não encontrada`,
+      );
     }
 
     return question;
@@ -63,16 +65,23 @@ export class AlternativesService {
       (!this.isAdmin(authUser) && uploadedFile.userId !== authUser.id)
     ) {
       throw new NotFoundException(
-        `Uploaded file with ID ${uploadedFileId} not found`,
+        `Arquivo enviado com ID ${uploadedFileId} não encontrado`,
       );
     }
   }
 
-  private validateCreatePayload(createAlternativeDto: CreateAlternativeDto): void {
+  private validateCreatePayload(
+    createAlternativeDto: CreateAlternativeDto,
+  ): void {
     const text = createAlternativeDto.text?.trim() ?? '';
 
-    if (createAlternativeDto.type === AlternativeType.TEXT && text.length === 0) {
-      throw new BadRequestException('TEXT alternatives must have non-empty text');
+    if (
+      createAlternativeDto.type === AlternativeType.TEXT &&
+      text.length === 0
+    ) {
+      throw new BadRequestException(
+        'Alternativas de texto devem ter texto preenchido',
+      );
     }
 
     if (
@@ -80,7 +89,7 @@ export class AlternativesService {
       createAlternativeDto.imageFileId
     ) {
       throw new BadRequestException(
-        'TEXT alternatives cannot include imageFileId',
+        'Alternativas de texto não podem incluir imagem',
       );
     }
 
@@ -89,7 +98,7 @@ export class AlternativesService {
       !createAlternativeDto.imageFileId
     ) {
       throw new BadRequestException(
-        'IMAGE alternatives must include imageFileId',
+        'Alternativas de imagem devem incluir um arquivo de imagem',
       );
     }
   }
@@ -101,7 +110,10 @@ export class AlternativesService {
     this.validateCreatePayload(createAlternativeDto);
 
     if (createAlternativeDto.imageFileId) {
-      await this.ensureUploadedFileAccess(createAlternativeDto.imageFileId, authUser);
+      await this.ensureUploadedFileAccess(
+        createAlternativeDto.imageFileId,
+        authUser,
+      );
     }
 
     const normalizedText = createAlternativeDto.text?.trim() ?? '';
@@ -113,7 +125,7 @@ export class AlternativesService {
       questionId: createAlternativeDto.questionId,
       imageFileId:
         createAlternativeDto.type === AlternativeType.IMAGE
-          ? createAlternativeDto.imageFileId ?? null
+          ? (createAlternativeDto.imageFileId ?? null)
           : null,
     };
   }
@@ -144,7 +156,7 @@ export class AlternativesService {
       (!this.isAdmin(authUser) &&
         alternative.question.topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Alternative with ID ${id} not found`);
+      throw new NotFoundException(`Alternativa com ID ${id} não encontrada`);
     }
 
     return alternative;
@@ -167,12 +179,16 @@ export class AlternativesService {
 
     if (nextType === AlternativeType.TEXT) {
       if (nextText.length === 0) {
-        throw new BadRequestException('TEXT alternatives must have non-empty text');
+        throw new BadRequestException(
+          'Alternativas de texto devem ter texto preenchido',
+        );
       }
     }
 
     if (nextType === AlternativeType.IMAGE && !nextImageFileId) {
-      throw new BadRequestException('IMAGE alternatives must include imageFileId');
+      throw new BadRequestException(
+        'Alternativas de imagem devem incluir um arquivo de imagem',
+      );
     }
 
     if (nextImageFileId) {
@@ -182,8 +198,10 @@ export class AlternativesService {
     return {
       text: nextText,
       type: nextType,
-      isCorrect: updateAlternativeDto.isCorrect ?? existingAlternative.isCorrect,
-      questionId: updateAlternativeDto.questionId ?? existingAlternative.questionId,
+      isCorrect:
+        updateAlternativeDto.isCorrect ?? existingAlternative.isCorrect,
+      questionId:
+        updateAlternativeDto.questionId ?? existingAlternative.questionId,
       imageFileId: nextType === AlternativeType.IMAGE ? nextImageFileId : null,
     };
   }
@@ -199,11 +217,14 @@ export class AlternativesService {
 
     if (question.type !== QuestionType.MULTIPLE_CHOICE) {
       throw new BadRequestException(
-        'Alternatives can only be added to MULTIPLE_CHOICE questions',
+        'Alternativas só podem ser adicionadas a questões de múltipla escolha',
       );
     }
 
-    const data = await this.buildValidatedCreateData(createAlternativeDto, authUser);
+    const data = await this.buildValidatedCreateData(
+      createAlternativeDto,
+      authUser,
+    );
 
     const alternative = await this.prisma.alternative.create({
       data,
@@ -241,7 +262,10 @@ export class AlternativesService {
     updateAlternativeDto: UpdateAlternativeDto,
     authUser: AuthTokenPayload,
   ): Promise<AlternativeEntity> {
-    const existingAlternative = await this.getAlternativeWithAccess(id, authUser);
+    const existingAlternative = await this.getAlternativeWithAccess(
+      id,
+      authUser,
+    );
 
     if (updateAlternativeDto.questionId) {
       const targetQuestion = await this.getAccessibleQuestion(
@@ -251,7 +275,7 @@ export class AlternativesService {
 
       if (targetQuestion.type !== QuestionType.MULTIPLE_CHOICE) {
         throw new BadRequestException(
-          'Alternatives can only be linked to MULTIPLE_CHOICE questions',
+          'Alternativas só podem ser vinculadas a questões de múltipla escolha',
         );
       }
     }

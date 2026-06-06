@@ -70,7 +70,7 @@ export class QuestionsService {
       !topic ||
       (!this.isAdmin(authUser) && topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Topic with ID ${topicId} not found`);
+      throw new NotFoundException(`Tópico com ID ${topicId} não encontrado`);
     }
   }
 
@@ -96,7 +96,7 @@ export class QuestionsService {
 
     if (uploadedFiles.length !== fileIds.length) {
       throw new NotFoundException(
-        'One or more uploaded files were not found for this user',
+        'Um ou mais arquivos enviados não foram encontrados para este usuário',
       );
     }
   }
@@ -108,7 +108,9 @@ export class QuestionsService {
 
     const normalizedFileIds = fileIds.filter(Boolean);
     if (normalizedFileIds.length !== fileIds.length) {
-      throw new BadRequestException('questionImageFileIds contains invalid values');
+      throw new BadRequestException(
+        'Lista de imagens da questão contém valores inválidos',
+      );
     }
 
     return normalizedFileIds;
@@ -134,7 +136,9 @@ export class QuestionsService {
       Array.isArray(orderData) ||
       !Array.isArray((orderData as { questions?: unknown }).questions)
     ) {
-      throw new BadRequestException('Exam version orderData is invalid');
+      throw new BadRequestException(
+        'Dados de ordenação da versão da prova estão inválidos',
+      );
     }
 
     const questions = (orderData as { questions: unknown[] }).questions.map(
@@ -145,7 +149,7 @@ export class QuestionsService {
           Array.isArray(question)
         ) {
           throw new BadRequestException(
-            'Exam version question order is invalid',
+            'Ordem das questões da versão da prova está inválida',
           );
         }
 
@@ -161,7 +165,7 @@ export class QuestionsService {
           !Array.isArray(parsedQuestion.alternatives)
         ) {
           throw new BadRequestException(
-            'Exam version question order is invalid',
+            'Ordem das questões da versão da prova está inválida',
           );
         }
 
@@ -172,7 +176,7 @@ export class QuestionsService {
             Array.isArray(alternative)
           ) {
             throw new BadRequestException(
-              'Exam version alternative order is invalid',
+              'Ordem das alternativas da versão da prova está inválida',
             );
           }
 
@@ -186,7 +190,7 @@ export class QuestionsService {
             typeof parsedAlternative.position !== 'number'
           ) {
             throw new BadRequestException(
-              'Exam version alternative order is invalid',
+              'Ordem das alternativas da versão da prova está inválida',
             );
           }
 
@@ -319,13 +323,13 @@ export class QuestionsService {
     if (createQuestionDto.type === QuestionType.DISSERTATIVE) {
       if (answerText.length === 0) {
         throw new BadRequestException(
-          'DISSERTATIVE questions must include answerText',
+          'Questões dissertativas devem incluir o texto da resposta',
         );
       }
 
       if (!answerSpaceSize) {
         throw new BadRequestException(
-          'DISSERTATIVE questions must include answerSpaceSize',
+          'Questões dissertativas devem incluir o tamanho do espaço de resposta',
         );
       }
     }
@@ -333,7 +337,7 @@ export class QuestionsService {
     if (createQuestionDto.type === QuestionType.MULTIPLE_CHOICE) {
       if (answerText.length > 0 || answerSpaceSize) {
         throw new BadRequestException(
-          'MULTIPLE_CHOICE questions cannot include answerText or answerSpaceSize',
+          'Questões de múltipla escolha não podem incluir resposta dissertativa nem tamanho de espaço de resposta',
         );
       }
     }
@@ -361,7 +365,7 @@ export class QuestionsService {
     });
 
     if (!currentQuestion) {
-      throw new NotFoundException(`Question with ID ${id} not found`);
+      throw new NotFoundException(`Questão com ID ${id} não encontrada`);
     }
 
     const nextType = updateQuestionDto.type ?? currentQuestion.type;
@@ -375,13 +379,13 @@ export class QuestionsService {
     if (nextType === QuestionType.DISSERTATIVE) {
       if (nextAnswerText.length === 0) {
         throw new BadRequestException(
-          'DISSERTATIVE questions must include answerText',
+          'Questões dissertativas devem incluir o texto da resposta',
         );
       }
 
       if (!nextAnswerSpaceSize) {
         throw new BadRequestException(
-          'DISSERTATIVE questions must include answerSpaceSize',
+          'Questões dissertativas devem incluir o tamanho do espaço de resposta',
         );
       }
     }
@@ -396,7 +400,7 @@ export class QuestionsService {
 
       if (nextAnswerText.length > 0 || nextAnswerSpaceSize) {
         throw new BadRequestException(
-          'MULTIPLE_CHOICE questions cannot include answerText or answerSpaceSize',
+          'Questões de múltipla escolha não podem incluir resposta dissertativa nem tamanho de espaço de resposta',
         );
       }
     }
@@ -418,11 +422,11 @@ export class QuestionsService {
       type: createQuestionDto.type,
       answerText:
         createQuestionDto.type === QuestionType.DISSERTATIVE
-          ? createQuestionDto.answerText?.trim() ?? null
+          ? (createQuestionDto.answerText?.trim() ?? null)
           : null,
       answerSpaceSize:
         createQuestionDto.type === QuestionType.DISSERTATIVE
-          ? createQuestionDto.answerSpaceSize ?? null
+          ? (createQuestionDto.answerSpaceSize ?? null)
           : null,
       topicId: createQuestionDto.topicId,
     };
@@ -448,7 +452,7 @@ export class QuestionsService {
 
       if (!createdQuestionWithRelations) {
         throw new NotFoundException(
-          `Question with ID ${createdQuestion.id} not found`,
+          `Questão com ID ${createdQuestion.id} não encontrada`,
         );
       }
 
@@ -500,7 +504,7 @@ export class QuestionsService {
       (!this.isAdmin(authUser) &&
         question.topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Question with ID ${id} not found`);
+      throw new NotFoundException(`Questão com ID ${id} não encontrada`);
     }
 
     return plainToInstance(QuestionEntity, question);
@@ -519,7 +523,9 @@ export class QuestionsService {
     }
 
     const questionImageFileIds = updateQuestionDto.questionImageFileIds
-      ? this.normalizeQuestionImageFileIds(updateQuestionDto.questionImageFileIds)
+      ? this.normalizeQuestionImageFileIds(
+          updateQuestionDto.questionImageFileIds,
+        )
       : undefined;
 
     if (questionImageFileIds) {
@@ -565,7 +571,10 @@ export class QuestionsService {
 
         if (questionImageFileIds.length > 0) {
           await tx.questionImage.createMany({
-            data: this.buildQuestionImageCreateManyData(id, questionImageFileIds),
+            data: this.buildQuestionImageCreateManyData(
+              id,
+              questionImageFileIds,
+            ),
           });
         }
       }
@@ -576,7 +585,7 @@ export class QuestionsService {
       });
 
       if (!updatedQuestion) {
-        throw new NotFoundException(`Question with ID ${id} not found`);
+        throw new NotFoundException(`Questão com ID ${id} não encontrada`);
       }
 
       return updatedQuestion;
@@ -622,9 +631,10 @@ export class QuestionsService {
 
     if (
       !question ||
-      (!this.isAdmin(authUser) && question.topic.discipline.userId !== authUser.id)
+      (!this.isAdmin(authUser) &&
+        question.topic.discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Question with ID ${id} not found`);
+      throw new NotFoundException(`Questão com ID ${id} não encontrada`);
     }
 
     const uploadedFileIdsToCleanup = new Set<string>();
@@ -650,7 +660,9 @@ export class QuestionsService {
           continue;
         }
 
-        const pdfFileId = this.extractUploadedFileIdFromContentUrl(version.pdfUrl);
+        const pdfFileId = this.extractUploadedFileIdFromContentUrl(
+          version.pdfUrl,
+        );
         if (pdfFileId) {
           uploadedFileIdsToCleanup.add(pdfFileId);
         }
@@ -686,9 +698,7 @@ export class QuestionsService {
             data: {
               orderData: nextOrderData as unknown as Prisma.InputJsonValue,
               answerKeyJson:
-                nextAnswerKeyJson === null
-                  ? Prisma.DbNull
-                  : nextAnswerKeyJson,
+                nextAnswerKeyJson === null ? Prisma.DbNull : nextAnswerKeyJson,
               pdfUrl: null,
               answerKeyUrl: null,
             },

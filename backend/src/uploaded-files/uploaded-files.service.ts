@@ -97,25 +97,27 @@ export class UploadedFilesService {
     file: UploadedMulterFile | undefined,
   ): asserts file is UploadedMulterFile {
     if (!file) {
-      throw new BadRequestException('File is required');
+      throw new BadRequestException('Arquivo é obrigatório');
     }
 
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      throw new BadRequestException(`Unsupported file type: ${file.mimetype}`);
+      throw new BadRequestException(
+        `Tipo de arquivo não suportado: ${file.mimetype}`,
+      );
     }
 
     if (file.size <= 0) {
-      throw new BadRequestException('File must not be empty');
+      throw new BadRequestException('Arquivo não pode estar vazio');
     }
 
     if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
       throw new BadRequestException(
-        `File must be smaller than ${MAX_UPLOAD_FILE_SIZE_BYTES} bytes`,
+        `Arquivo deve ter menos de ${MAX_UPLOAD_FILE_SIZE_BYTES} bytes`,
       );
     }
 
     if (!Buffer.isBuffer(file.buffer)) {
-      throw new BadRequestException('Invalid upload payload');
+      throw new BadRequestException('Dados de upload inválidos');
     }
   }
 
@@ -150,7 +152,7 @@ export class UploadedFilesService {
           !STORAGE_KEY_SEGMENT_PATTERN.test(segment),
       )
     ) {
-      throw new NotFoundException('Uploaded file content not found');
+      throw new NotFoundException('Conteúdo do arquivo enviado não encontrado');
     }
 
     return segments;
@@ -164,7 +166,7 @@ export class UploadedFilesService {
     const relativePath = relative(this.uploadRootDir, absolutePath);
 
     if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
-      throw new NotFoundException('Uploaded file content not found');
+      throw new NotFoundException('Conteúdo do arquivo enviado não encontrado');
     }
 
     return absolutePath;
@@ -182,7 +184,7 @@ export class UploadedFilesService {
       !uploadedFile ||
       (!this.isAdmin(authUser) && uploadedFile.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Uploaded file with ID ${id} not found`);
+      throw new NotFoundException(`Arquivo enviado com ID ${id} não encontrado`);
     }
 
     return uploadedFile;
@@ -245,7 +247,7 @@ export class UploadedFilesService {
       await access(absolutePath);
     } catch {
       throw new NotFoundException(
-        `Uploaded file content with ID ${id} not found`,
+        `Conteúdo do arquivo enviado com ID ${id} não encontrado`,
       );
     }
 
@@ -271,7 +273,7 @@ export class UploadedFilesService {
         error.code === 'P2003'
       ) {
         throw new BadRequestException(
-          'Cannot delete uploaded file because it is linked to other records',
+          'Não é possível excluir o arquivo enviado porque ele está vinculado a outros registros',
         );
       }
 

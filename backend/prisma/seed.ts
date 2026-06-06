@@ -37,7 +37,9 @@ async function main() {
     },
   });
 
-  console.log('Seeding disciplines, topics, exams, questions and alternatives...');
+  console.log(
+    'Seeding disciplines, topics, exams, questions and alternatives...',
+  );
 
   const regularUser = await prisma.user.findUniqueOrThrow({
     where: { email: 'user@example.com' },
@@ -52,7 +54,7 @@ async function main() {
 
   const topic = await prisma.topic.create({
     data: {
-      name: 'Arvores Binarias',
+      name: 'Árvores Binárias',
       disciplineId: discipline.id,
     },
   });
@@ -60,7 +62,7 @@ async function main() {
   const exam = await prisma.exam.create({
     data: {
       name: 'Prova 1',
-      description: 'Versao base da prova',
+      description: 'Versão base da prova',
       userId: regularUser.id,
       disciplineId: discipline.id,
     },

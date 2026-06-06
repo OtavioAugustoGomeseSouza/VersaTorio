@@ -10,24 +10,27 @@ import {
 } from 'class-validator';
 
 export class TopicDrawRuleDto {
-  @IsUUID()
-  @IsNotEmpty()
+  @IsUUID(undefined, { message: 'ID do tópico inválido' })
+  @IsNotEmpty({ message: 'ID do tópico é obrigatório' })
   topicId: string;
 
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'Quantidade de questões deve ser um número inteiro' })
+  @Min(1, { message: 'Quantidade de questões deve ser no mínimo 1' })
   quantity: number;
 }
 
 export class DrawQuestionsDto {
-  @IsUUID()
-  @IsNotEmpty()
+  @IsUUID(undefined, { message: 'ID da disciplina inválido' })
+  @IsNotEmpty({ message: 'ID da disciplina é obrigatório' })
   disciplineId: string;
 
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
+  @IsArray({ message: 'Regras de sorteio devem estar em uma lista' })
+  @ArrayMinSize(1, { message: 'Adicione pelo menos uma regra de sorteio' })
+  @ValidateNested({
+    each: true,
+    message: 'Cada regra de sorteio deve ter tópico e quantidade válidos',
+  })
   @Type(() => TopicDrawRuleDto)
   topicRules: TopicDrawRuleDto[];
 }

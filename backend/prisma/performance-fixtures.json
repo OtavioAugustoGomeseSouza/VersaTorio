@@ -2,9 +2,9 @@
   "generatedAt": "2026-05-21T13:15:24.060Z",
   "password": "perf123",
   "notes": [
-    "Use professorEmail para testar listagem de questoes, filtro por topico, geracao de versoes e geracao de PDF.",
-    "Use loginUserEmail quando quiser medir login em um cenario com a quantidade correspondente de usuarios de teste.",
-    "Este seed apaga somente usuarios com email @perf.local antes de recriar os dados."
+    "Use professorEmail para testar listagem de questões, filtro por tópico, geração de versões e geração de PDF.",
+    "Use loginUserEmail quando quiser medir login em um cenário com a quantidade correspondente de usuários de teste.",
+    "Este seed apaga somente usuários com e-mail @perf.local antes de recriar os dados."
   ],
   "scenarios": [
     {

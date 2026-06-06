@@ -46,10 +46,10 @@ export class ExamsService {
     const letter = String.fromCharCode(65 + letterIndex);
 
     if (cycle === 0) {
-      return `Versao ${letter}`;
+      return `Versão ${letter}`;
     }
 
-    return `Versao ${letter}${cycle + 1}`;
+    return `Versão ${letter}${cycle + 1}`;
   }
 
   private shuffleArray<T>(array: T[]): T[] {
@@ -104,7 +104,7 @@ export class ExamsService {
       (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(
-        `Discipline with ID ${disciplineId} not found`,
+        `Disciplina com ID ${disciplineId} não encontrada`,
       );
     }
 
@@ -121,7 +121,7 @@ export class ExamsService {
     });
 
     if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
-      throw new NotFoundException(`Exam with ID ${examId} not found`);
+      throw new NotFoundException(`Prova com ID ${examId} não encontrada`);
     }
 
     return exam;
@@ -149,7 +149,7 @@ export class ExamsService {
     });
 
     if (questions.length !== questionIds.length) {
-      throw new NotFoundException('One or more questions were not found');
+      throw new NotFoundException('Uma ou mais questões não foram encontradas');
     }
 
     if (
@@ -158,7 +158,7 @@ export class ExamsService {
         (question) => question.topic.discipline.userId !== authUser.id,
       )
     ) {
-      throw new NotFoundException('One or more questions were not found');
+      throw new NotFoundException('Uma ou mais questões não foram encontradas');
     }
 
     return questions;
@@ -177,13 +177,13 @@ export class ExamsService {
       if (question.type === QuestionType.DISSERTATIVE) {
         if (!question.answerText || !question.answerSpaceSize) {
           throw new BadRequestException(
-            `Question ${question.id} must include answerText and answerSpaceSize for DISSERTATIVE`,
+            `Questão ${question.id} deve incluir resposta e tamanho do espaço de resposta para ser dissertativa`,
           );
         }
 
         if (totalAlternatives > 0) {
           throw new BadRequestException(
-            `Question ${question.id} cannot have alternatives for DISSERTATIVE`,
+            `Questão ${question.id} não pode ter alternativas porque é dissertativa`,
           );
         }
 
@@ -192,19 +192,19 @@ export class ExamsService {
 
       if (totalAlternatives < 2) {
         throw new BadRequestException(
-          `Question ${question.id} must have at least 2 alternatives`,
+          `Questão ${question.id} deve ter pelo menos 2 alternativas`,
         );
       }
 
       if (correctAlternatives < 1) {
         throw new BadRequestException(
-          `Question ${question.id} must have at least 1 correct alternative`,
+          `Questão ${question.id} deve ter pelo menos 1 alternativa correta`,
         );
       }
 
       if (distributeCorrectAlternatives && correctAlternatives !== 1) {
         throw new BadRequestException(
-          `Question ${question.id} must have exactly 1 correct alternative to distribute correct alternatives proportionally`,
+          `Questão ${question.id} deve ter exatamente 1 alternativa correta para distribuir as alternativas corretas proporcionalmente`,
         );
       }
     }
@@ -287,7 +287,7 @@ export class ExamsService {
           const question = questionById.get(questionId);
           if (!question) {
             throw new NotFoundException(
-              `Question with ID ${questionId} not found`,
+              `Questão com ID ${questionId} não encontrada`,
             );
           }
 
@@ -352,7 +352,7 @@ export class ExamsService {
 
     if (topics.length !== topicIds.length) {
       throw new NotFoundException(
-        'One or more topics were not found for this discipline',
+        'Um ou mais tópicos não foram encontrados para esta disciplina',
       );
     }
 
@@ -385,7 +385,7 @@ export class ExamsService {
 
       if (quantity > availableQuestionIds.length) {
         throw new BadRequestException(
-          `Topic ${topicId} has only ${availableQuestionIds.length} available questions`,
+          `Tópico ${topicId} possui apenas ${availableQuestionIds.length} questão(ões) disponível(is)`,
         );
       }
 
@@ -422,7 +422,7 @@ export class ExamsService {
     });
 
     if (!exam || (!this.isAdmin(authUser) && exam.userId !== authUser.id)) {
-      throw new NotFoundException(`Exam with ID ${id} not found`);
+      throw new NotFoundException(`Prova com ID ${id} não encontrada`);
     }
 
     return plainToInstance(ExamEntity, exam);
@@ -499,7 +499,7 @@ export class ExamsService {
         question.topic.discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(
-        `Question with ID ${addExamQuestionDto.questionId} not found`,
+        `Questão com ID ${addExamQuestionDto.questionId} não encontrada`,
       );
     }
 
@@ -517,7 +517,7 @@ export class ExamsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Question is already associated with exam');
+        throw new ConflictException('Questão já associada a esta prova');
       }
       throw error;
     }
@@ -540,7 +540,7 @@ export class ExamsService {
     });
 
     if (!examQuestion) {
-      throw new NotFoundException('Question is not associated with this exam');
+      throw new NotFoundException('Questão não associada a esta prova');
     }
 
     const removed = await this.prisma.examQuestion.delete({

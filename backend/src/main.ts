@@ -1,4 +1,8 @@
-import { ValidationPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
@@ -18,10 +22,32 @@ function resolveCorsOrigins(): string[] {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('APP_CORS_ORIGINS must be configured in production');
+    throw new Error('APP_CORS_ORIGINS deve ser configurado em produção');
   }
 
   return DEFAULT_DEVELOPMENT_CORS_ORIGINS;
+}
+
+function formatValidationErrors(
+  errors: ValidationError[],
+  parentPath = '',
+): string[] {
+  return errors.flatMap((error) => {
+    const propertyPath = parentPath
+      ? `${parentPath}.${error.property}`
+      : error.property;
+    const constraintMessages = Object.entries(error.constraints ?? {}).map(
+      ([constraint, message]) =>
+        constraint === 'whitelistValidation'
+          ? `Campo "${propertyPath}" não é permitido`
+          : message,
+    );
+
+    return [
+      ...constraintMessages,
+      ...formatValidationErrors(error.children ?? [], propertyPath),
+    ];
+  });
 }
 
 async function bootstrap() {
@@ -37,6 +63,8 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) =>
+        new BadRequestException(formatValidationErrors(errors)),
     }),
   );
   await app.listen(process.env.PORT ?? 3000);

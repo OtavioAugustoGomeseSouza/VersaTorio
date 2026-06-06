@@ -121,22 +121,22 @@ async function createQuestion(
       alternatives: {
         create: [
           {
-            text: 'Um algoritmo e uma sequencia finita de passos para resolver um problema.',
+            text: 'Um algoritmo é uma sequência finita de passos para resolver um problema.',
             type: AlternativeType.TEXT,
             isCorrect: true,
           },
           {
-            text: 'Um algoritmo sempre depende de interface grafica para executar.',
+            text: 'Um algoritmo sempre depende de interface gráfica para executar.',
             type: AlternativeType.TEXT,
             isCorrect: false,
           },
           {
-            text: 'Um algoritmo nao pode ser representado por pseudocodigo.',
+            text: 'Um algoritmo não pode ser representado por pseudocódigo.',
             type: AlternativeType.TEXT,
             isCorrect: false,
           },
           {
-            text: 'Um algoritmo correto ignora dados de entrada invalidos.',
+            text: 'Um algoritmo correto ignora dados de entrada inválidos.',
             type: AlternativeType.TEXT,
             isCorrect: false,
           },
@@ -187,7 +187,7 @@ async function createScenario(
 
   const topic = await prisma.topic.create({
     data: {
-      name: `PERF ${countLabel} - Arvores Binarias`,
+      name: `PERF ${countLabel} - Árvores Binárias`,
       disciplineId: discipline.id,
     },
   });
@@ -199,8 +199,8 @@ async function createScenario(
 
   const exam = await prisma.exam.create({
     data: {
-      name: `PERF ${countLabel} - Prova com ${count} questoes`,
-      description: `Cenario de desempenho com ${count} questoes objetivas.`,
+      name: `PERF ${countLabel} - Prova com ${count} questões`,
+      description: `Cenário de desempenho com ${count} questões objetivas.`,
       userId: professor.id,
       disciplineId: discipline.id,
       shuffleQuestions: true,
@@ -218,7 +218,7 @@ async function createScenario(
 
   const version = await prisma.examVersion.create({
     data: {
-      name: 'Versao A',
+      name: 'Versão A',
       examId: exam.id,
       orderData: buildOrderData(questions),
     },
@@ -243,9 +243,9 @@ async function writeManifest(scenarios: ScenarioSummary[]): Promise<void> {
     generatedAt: new Date().toISOString(),
     password: TEST_PASSWORD,
     notes: [
-      'Use professorEmail para testar listagem de questoes, filtro por topico, geracao de versoes e geracao de PDF.',
-      'Use loginUserEmail quando quiser medir login em um cenario com a quantidade correspondente de usuarios de teste.',
-      'Este seed apaga somente usuarios com email @perf.local antes de recriar os dados.',
+      'Use professorEmail para testar listagem de questões, filtro por tópico, geração de versões e geração de PDF.',
+      'Use loginUserEmail quando quiser medir login em um cenário com a quantidade correspondente de usuários de teste.',
+      'Este seed apaga somente usuários com e-mail @perf.local antes de recriar os dados.',
     ],
     scenarios,
   };
@@ -262,12 +262,12 @@ async function main(): Promise<void> {
   const counts = parseCounts();
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
-  console.log(`Preparando cenarios de desempenho: ${counts.join(', ')}`);
+  console.log(`Preparando cenários de desempenho: ${counts.join(', ')}`);
   await cleanupPerformanceData();
 
   const scenarios: ScenarioSummary[] = [];
   for (const count of counts) {
-    console.log(`Criando cenario com ${count} registro(s)...`);
+    console.log(`Criando cenário com ${count} registro(s)...`);
     scenarios.push(await createScenario(count, passwordHash));
   }
 
@@ -279,7 +279,7 @@ async function main(): Promise<void> {
       professor: scenario.professorEmail,
       login: scenario.loginUserEmail,
       senha: scenario.password,
-      questoes: scenario.questionCount,
+      questões: scenario.questionCount,
       examId: scenario.examId,
       versionId: scenario.versionId,
     })),

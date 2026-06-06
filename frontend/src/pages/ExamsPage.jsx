@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 import { navigate } from '../lib/router';
 
@@ -16,6 +17,7 @@ function createDrawRule(topicId = '') {
 }
 
 export default function ExamsPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [disciplines, setDisciplines] = useState([]);
   const [topicsByDiscipline, setTopicsByDiscipline] = useState({});
   const [questions, setQuestions] = useState([]);
@@ -41,7 +43,6 @@ export default function ExamsPage({ token, onUnauthorized }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [drawing, setDrawing] = useState(false);
-  const [message, setMessage] = useState('');
   const [collapsedDisciplines, setCollapsedDisciplines] = useState({});
   const [collapsedTopics, setCollapsedTopics] = useState({});
 
@@ -144,7 +145,6 @@ export default function ExamsPage({ token, onUnauthorized }) {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setMessage('');
 
     try {
       const [disciplinesData, questionsData, examsData] = await Promise.all([
@@ -172,11 +172,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar provas');
+      notify(error.message ?? 'Erro ao carregar provas', 'error');
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, notify]);
 
   useEffect(() => {
     loadData();
@@ -313,8 +313,9 @@ export default function ExamsPage({ token, onUnauthorized }) {
 
   async function handleDrawQuestions() {
     if (!selectedDisciplineId) {
-      setMessage(
+      notify(
         'Para sortear por tópico, selecione uma disciplina específica.',
+        'error',
       );
       return;
     }
@@ -327,12 +328,11 @@ export default function ExamsPage({ token, onUnauthorized }) {
       .filter((rule) => rule.topicId && rule.quantity > 0);
 
     if (topicRules.length === 0) {
-      setMessage('Adicione ao menos um tópico com quantidade para sortear');
+      notify('Adicione ao menos um tópico com quantidade para sortear', 'error');
       return;
     }
 
     setDrawing(true);
-    setMessage('');
 
     try {
       const drawResult = await apiRequest('/exams/draw-questions', {
@@ -347,13 +347,13 @@ export default function ExamsPage({ token, onUnauthorized }) {
       setSelectedQuestionIds(drawResult.questionIds ?? []);
       setDrawResultByTopic(drawResult.topicSelections ?? []);
       setHasDrawRun(true);
-      setMessage('Questões sorteadas com sucesso');
+      notify('Questões sorteadas com sucesso', 'success');
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao sortear questões');
+      notify(error.message ?? 'Erro ao sortear questões', 'error');
     } finally {
       setDrawing(false);
     }
@@ -366,7 +366,6 @@ export default function ExamsPage({ token, onUnauthorized }) {
     }
 
     setSaving(true);
-    setMessage('');
 
     try {
       const createdExam = await apiRequest('/exams', {
@@ -388,7 +387,7 @@ export default function ExamsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao criar prova');
+      notify(error.message ?? 'Erro ao criar prova', 'error');
     } finally {
       setSaving(false);
     }
@@ -400,21 +399,19 @@ export default function ExamsPage({ token, onUnauthorized }) {
       return;
     }
 
-    setMessage('');
-
     try {
       await apiRequest(`/exams/${examId}`, {
         method: 'DELETE',
         token,
       });
-      setMessage('Prova removida');
+      notify('Prova removida', 'success');
       await loadData();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao remover prova');
+      notify(error.message ?? 'Erro ao remover prova', 'error');
     }
   }
 
@@ -850,8 +847,6 @@ export default function ExamsPage({ token, onUnauthorized }) {
           </button>
         </form>
       </section>
-
-      {message ? <p className="feedback">{message}</p> : null}
 
       <section className="card">
         <h2>Lista de provas</h2>

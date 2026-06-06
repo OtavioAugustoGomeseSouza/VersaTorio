@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { API_URL, apiRequest } from '../lib/api';
 import { appConfig } from '../lib/app-config';
 
@@ -33,6 +34,7 @@ function buildAnswerKeyFileName(version, exam) {
 }
 
 function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
+  const { notify } = useToast();
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewError, setPreviewError] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -76,7 +78,9 @@ function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
         }
       } catch (error) {
         if (!isCancelled) {
-          setPreviewError(error.message ?? 'Erro ao carregar prévia do PDF');
+          const message = error.message ?? 'Erro ao carregar prévia do PDF';
+          setPreviewError(message);
+          notify(message, 'error');
         }
       } finally {
         if (!isCancelled) {
@@ -93,14 +97,14 @@ function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [token, pdfUrl, onUnauthorized]);
+  }, [token, pdfUrl, onUnauthorized, notify]);
 
   if (previewLoading) {
     return <p className="muted">Carregando prévia...</p>;
   }
 
   if (previewError) {
-    return <p className="feedback error">{previewError}</p>;
+    return null;
   }
 
   if (!previewUrl) {
@@ -113,6 +117,7 @@ function AuthenticatedPdfPreview({ token, pdfUrl, title, onUnauthorized }) {
 }
 
 export default function VersionsPage({ token, onUnauthorized }) {
+  const { notify } = useToast();
   const [exams, setExams] = useState([]);
   const [versions, setVersions] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState('');
@@ -129,7 +134,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
   const [generatingAnswerKeyId, setGeneratingAnswerKeyId] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
   const examById = useMemo(() => {
     const result = {};
@@ -153,7 +157,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setMessage('');
 
     try {
       const [examsData, versionsData] = await Promise.all([
@@ -197,11 +200,11 @@ export default function VersionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao carregar versões');
+      notify(error.message ?? 'Erro ao carregar versões', 'error');
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, notify]);
 
   useEffect(() => {
     loadData();
@@ -223,21 +226,19 @@ export default function VersionsPage({ token, onUnauthorized }) {
       return;
     }
 
-    setMessage('');
-
     try {
       await apiRequest(`/exam-versions/${id}`, {
         method: 'DELETE',
         token,
       });
-      setMessage('Versão removida');
+      notify('Versão removida', 'success');
       await loadData();
     } catch (error) {
       if (error.status === 401) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao remover versão');
+      notify(error.message ?? 'Erro ao remover versão', 'error');
     }
   }
 
@@ -246,7 +247,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
     setPdfHeaderFields(createDefaultHeaderFields());
     setPdfColumns(DEFAULT_PDF_COLUMNS);
     setIncludeVersionInFooter(DEFAULT_PDF_INCLUDE_VERSION_IN_FOOTER);
-    setMessage('');
   }
 
   function closePdfModal() {
@@ -324,12 +324,10 @@ export default function VersionsPage({ token, onUnauthorized }) {
       return;
     }
 
-    setMessage('');
-
     try {
       await downloadPdf(version, version.pdfUrl);
     } catch (error) {
-      setMessage(error.message ?? 'Erro ao baixar PDF');
+      notify(error.message ?? 'Erro ao baixar PDF', 'error');
     }
   }
 
@@ -338,12 +336,10 @@ export default function VersionsPage({ token, onUnauthorized }) {
       return;
     }
 
-    setMessage('');
-
     try {
       await downloadAnswerKey(version, version.answerKeyUrl);
     } catch (error) {
-      setMessage(error.message ?? 'Erro ao baixar gabarito');
+      notify(error.message ?? 'Erro ao baixar gabarito', 'error');
     }
   }
 
@@ -362,12 +358,11 @@ export default function VersionsPage({ token, onUnauthorized }) {
       .filter((field) => field.label.length > 0);
 
     if (headerFields.length === 0) {
-      setMessage('Adicione ao menos um campo no cabeçalho do PDF');
+      notify('Adicione ao menos um campo no cabeçalho do PDF', 'error');
       return;
     }
 
     setGeneratingPdf(true);
-    setMessage('');
 
     try {
       const updatedVersion = await apiRequest(
@@ -390,7 +385,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
       );
       setSelectedVersionId(updatedVersion.id);
       setPdfVersion(null);
-      setMessage('PDF gerado');
+      notify('PDF gerado', 'success');
 
       if (updatedVersion.pdfUrl) {
         await downloadPdf(updatedVersion, updatedVersion.pdfUrl);
@@ -400,7 +395,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao gerar PDF');
+      notify(error.message ?? 'Erro ao gerar PDF', 'error');
     } finally {
       setGeneratingPdf(false);
     }
@@ -408,7 +403,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
 
   async function handleGenerateAnswerKey(version) {
     setGeneratingAnswerKeyId(version.id);
-    setMessage('');
 
     try {
       const updatedVersion = await apiRequest(
@@ -430,7 +424,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
         ),
       );
       setSelectedVersionId(updatedVersion.id);
-      setMessage('Gabarito gerado');
+      notify('Gabarito gerado', 'success');
 
       if (updatedVersion.answerKeyUrl) {
         await downloadAnswerKey(updatedVersion, updatedVersion.answerKeyUrl);
@@ -440,7 +434,7 @@ export default function VersionsPage({ token, onUnauthorized }) {
         onUnauthorized();
         return;
       }
-      setMessage(error.message ?? 'Erro ao gerar gabarito');
+      notify(error.message ?? 'Erro ao gerar gabarito', 'error');
     } finally {
       setGeneratingAnswerKeyId('');
     }
@@ -520,8 +514,6 @@ export default function VersionsPage({ token, onUnauthorized }) {
           </div>
         </div>
       </section>
-
-      {message ? <p className="feedback">{message}</p> : null}
 
       <section className="card">
         <h2>Versões geradas</h2>

@@ -114,7 +114,7 @@ describe('QuestionsService', () => {
                   ],
                 },
                 answerKeyJson: {
-                  version: 'Versao A',
+                  version: 'Versão A',
                   answers: [
                     {
                       questionNumber: 1,
@@ -169,7 +169,7 @@ describe('QuestionsService', () => {
           ],
         } as unknown as Prisma.InputJsonValue,
         answerKeyJson: {
-          version: 'Versao A',
+          version: 'Versão A',
           answers: [
             {
               questionNumber: 1,
