@@ -9,6 +9,7 @@ export class ExamEntity {
   description?: string;
   shuffleQuestions: boolean;
   shuffleAlternatives: boolean;
+  distributeCorrectAlternatives: boolean;
   versionsCountDefault: number;
   createdAt: Date;
   updatedAt: Date;

@@ -36,6 +36,10 @@ export class CreateExamDto {
   @IsOptional()
   shuffleAlternatives?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  distributeCorrectAlternatives?: boolean;
+
   @Type(() => Number)
   @IsInt()
   @Min(1)

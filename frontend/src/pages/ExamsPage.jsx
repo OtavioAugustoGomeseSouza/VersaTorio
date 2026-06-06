@@ -34,6 +34,8 @@ export default function ExamsPage({ token, onUnauthorized }) {
 
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleAlternatives, setShuffleAlternatives] = useState(true);
+  const [distributeCorrectAlternatives, setDistributeCorrectAlternatives] =
+    useState(false);
   const [versionsCount, setVersionsCount] = useState(1);
 
   const [loading, setLoading] = useState(false);
@@ -376,6 +378,7 @@ export default function ExamsPage({ token, onUnauthorized }) {
           questionIds: selectedQuestionIds,
           shuffleQuestions,
           shuffleAlternatives,
+          distributeCorrectAlternatives,
           versionsCount: effectiveVersionsCount,
         },
       });
@@ -786,6 +789,10 @@ export default function ExamsPage({ token, onUnauthorized }) {
                 const nextShuffleAlternatives = event.target.checked;
                 setShuffleAlternatives(nextShuffleAlternatives);
 
+                if (!nextShuffleAlternatives) {
+                  setDistributeCorrectAlternatives(false);
+                }
+
                 if (!shuffleQuestions && !nextShuffleAlternatives) {
                   setVersionsCount(1);
                 }
@@ -793,6 +800,23 @@ export default function ExamsPage({ token, onUnauthorized }) {
             />
             Embaralhar alternativas
           </label>
+
+          {shuffleAlternatives ? (
+            <label
+              className="checkbox-label"
+              htmlFor="distribute-correct-alternatives"
+            >
+              <input
+                id="distribute-correct-alternatives"
+                type="checkbox"
+                checked={distributeCorrectAlternatives}
+                onChange={(event) =>
+                  setDistributeCorrectAlternatives(event.target.checked)
+                }
+              />
+              Distribuir proporcionalmente alternativas corretas
+            </label>
+          ) : null}
 
           <label htmlFor="versions-count">Quantidade de versões</label>
           <input
@@ -859,7 +883,8 @@ export default function ExamsPage({ token, onUnauthorized }) {
                   <td>{disciplineById[exam.disciplineId]?.name ?? '-'}</td>
                   <td>
                     Q:{exam.shuffleQuestions ? 'ON' : 'OFF'} | A:
-                    {exam.shuffleAlternatives ? 'ON' : 'OFF'} | N:
+                    {exam.shuffleAlternatives ? 'ON' : 'OFF'} | D:
+                    {exam.distributeCorrectAlternatives ? 'ON' : 'OFF'} | N:
                     {exam.versionsCountDefault}
                   </td>
                   <td>{new Date(exam.createdAt).toLocaleDateString()}</td>

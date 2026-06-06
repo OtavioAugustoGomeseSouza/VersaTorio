@@ -74,6 +74,7 @@ model Exam {
   description  String?
   shuffleQuestions    Boolean  @default(true)
   shuffleAlternatives Boolean  @default(true)
+  distributeCorrectAlternatives Boolean @default(false)
   versionsCountDefault Int     @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

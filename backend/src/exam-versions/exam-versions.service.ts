@@ -19,6 +19,10 @@ import { GenerateExamVersionPdfDto } from './dto/generate-exam-version-pdf.dto';
 import { GenerateExamVersionAnswerKeyDto } from './dto/generate-exam-version-answer-key.dto';
 import { UploadedFilesService } from '../uploaded-files/uploaded-files.service';
 import { getExamPdfConfig } from './exam-pdf.config';
+import {
+  buildExamVersionOrderData,
+  type ExamVersionOrderData,
+} from '../exams/exam-ordering.util';
 
 type PdfDocumentNode = Record<string, unknown>;
 type PdfMake = {
@@ -32,16 +36,6 @@ type PdfMake = {
 const pdfMake = require('pdfmake') as PdfMake;
 let isPdfMakeConfigured = false;
 
-type ExamVersionOrderData = {
-  questions: Array<{
-    questionId: string;
-    position: number;
-    alternatives: Array<{
-      alternativeId: string;
-      position: number;
-    }>;
-  }>;
-};
 type AccessibleExam = Awaited<
   ReturnType<ExamVersionsService['getAccessibleExam']>
 >;
@@ -189,7 +183,10 @@ export class ExamVersionsService {
     return examVersion;
   }
 
-  private validateExamQuestionsForGeneration(exam: AccessibleExam): void {
+  private validateExamQuestionsForGeneration(
+    exam: AccessibleExam,
+    distributeCorrectAlternatives: boolean,
+  ): void {
     if (exam.examQuestions.length === 0) {
       throw new BadRequestException(
         'Cannot generate exam version without questions',
@@ -231,6 +228,12 @@ export class ExamVersionsService {
           `Question ${question.id} must have at least 1 correct alternative`,
         );
       }
+
+      if (distributeCorrectAlternatives && correctAlternatives !== 1) {
+        throw new BadRequestException(
+          `Question ${question.id} must have exactly 1 correct alternative to distribute correct alternatives proportionally`,
+        );
+      }
     }
   }
 
@@ -239,34 +242,38 @@ export class ExamVersionsService {
     name: string,
     shuffleQuestionsOverride: boolean | undefined,
     shuffleAlternativesOverride: boolean | undefined,
+    distributeCorrectAlternativesOverride: boolean | undefined,
     authUser: AuthTokenPayload,
   ) {
     const exam = await this.getAccessibleExam(examId, authUser);
-    this.validateExamQuestionsForGeneration(exam);
 
     const shouldShuffleQuestions =
       shuffleQuestionsOverride ?? exam.shuffleQuestions;
     const shouldShuffleAlternatives =
       shuffleAlternativesOverride ?? exam.shuffleAlternatives;
+    const shouldDistributeCorrectAlternatives =
+      shouldShuffleAlternatives &&
+      (distributeCorrectAlternativesOverride ??
+        exam.distributeCorrectAlternatives);
+
+    this.validateExamQuestionsForGeneration(
+      exam,
+      shouldDistributeCorrectAlternatives,
+    );
 
     const orderedQuestions = this.shuffleQuestions(
       exam.examQuestions.map((examQuestion) => examQuestion.question),
       shouldShuffleQuestions,
     );
 
-    const orderData: ExamVersionOrderData = {
-      questions: orderedQuestions.map((question, questionIndex) => ({
-        questionId: question.id,
-        position: questionIndex + 1,
-        alternatives: this.shuffleAlternatives(
-          [...question.alternatives],
-          shouldShuffleAlternatives,
-        ).map((alternative, alternativeIndex) => ({
-          alternativeId: alternative.id,
-          position: alternativeIndex + 1,
-        })),
-      })),
-    };
+    const orderData: ExamVersionOrderData = buildExamVersionOrderData(
+      orderedQuestions,
+      {
+        shuffleAlternatives: shouldShuffleAlternatives,
+        distributeCorrectAlternatives: shouldDistributeCorrectAlternatives,
+        shuffleArray: this.shuffleArray.bind(this),
+      },
+    );
 
     return this.prisma.examVersion.create({
       data: {
@@ -283,17 +290,6 @@ export class ExamVersionsService {
     }
 
     return this.shuffleArray(questions);
-  }
-
-  private shuffleAlternatives<T>(
-    alternatives: T[],
-    shouldShuffle: boolean,
-  ): T[] {
-    if (!shouldShuffle) {
-      return [...alternatives];
-    }
-
-    return this.shuffleArray(alternatives);
   }
 
   private shuffleArray<T>(array: T[]): T[] {

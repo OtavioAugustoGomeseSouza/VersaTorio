@@ -1,4 +1,10 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateExamVersionDto {
   @IsString()
@@ -16,4 +22,8 @@ export class CreateExamVersionDto {
   @IsBoolean()
   @IsOptional()
   shuffleAlternatives?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  distributeCorrectAlternatives?: boolean;
 }

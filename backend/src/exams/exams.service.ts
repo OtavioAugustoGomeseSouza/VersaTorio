@@ -15,19 +15,9 @@ import { AddExamQuestionDto } from './dto/add-exam-question.dto';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { DrawQuestionsDto } from './dto/draw-questions.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
+import { buildExamVersionOrderData } from './exam-ordering.util';
 import { ExamEntity } from './entities/exam.entity';
 import { ExamQuestionEntity } from './entities/exam-question.entity';
-
-type ExamVersionOrderData = {
-  questions: Array<{
-    questionId: string;
-    position: number;
-    alternatives: Array<{
-      alternativeId: string;
-      position: number;
-    }>;
-  }>;
-};
 
 type QuestionForCreation = {
   id: string;
@@ -81,17 +71,6 @@ export class ExamsService {
     return this.shuffleArray(questions);
   }
 
-  private shuffleAlternatives<T>(
-    alternatives: T[],
-    shouldShuffle: boolean,
-  ): T[] {
-    if (!shouldShuffle) {
-      return [...alternatives];
-    }
-
-    return this.shuffleArray(alternatives);
-  }
-
   private normalizeVersionsCount(
     shuffleQuestions: boolean,
     shuffleAlternatives: boolean,
@@ -104,23 +83,11 @@ export class ExamsService {
     return versionsCount;
   }
 
-  private buildOrderData(
-    questions: QuestionForOrder[],
+  private normalizeDistributeCorrectAlternatives(
     shuffleAlternatives: boolean,
-  ): ExamVersionOrderData {
-    return {
-      questions: questions.map((question, questionIndex) => ({
-        questionId: question.id,
-        position: questionIndex + 1,
-        alternatives: this.shuffleAlternatives(
-          question.alternatives,
-          shuffleAlternatives,
-        ).map((alternative, alternativeIndex) => ({
-          alternativeId: alternative.id,
-          position: alternativeIndex + 1,
-        })),
-      })),
-    };
+    distributeCorrectAlternatives?: boolean,
+  ): boolean {
+    return shuffleAlternatives && Boolean(distributeCorrectAlternatives);
   }
 
   private async ensureDisciplineAccess(
@@ -136,7 +103,9 @@ export class ExamsService {
       !discipline ||
       (!this.isAdmin(authUser) && discipline.userId !== authUser.id)
     ) {
-      throw new NotFoundException(`Discipline with ID ${disciplineId} not found`);
+      throw new NotFoundException(
+        `Discipline with ID ${disciplineId} not found`,
+      );
     }
 
     return discipline;
@@ -197,6 +166,7 @@ export class ExamsService {
 
   private validateQuestionAlternativesForVersionCreation(
     questions: QuestionForOrder[],
+    distributeCorrectAlternatives: boolean,
   ): void {
     for (const question of questions) {
       const totalAlternatives = question.alternatives.length;
@@ -231,6 +201,12 @@ export class ExamsService {
           `Question ${question.id} must have at least 1 correct alternative`,
         );
       }
+
+      if (distributeCorrectAlternatives && correctAlternatives !== 1) {
+        throw new BadRequestException(
+          `Question ${question.id} must have exactly 1 correct alternative to distribute correct alternatives proportionally`,
+        );
+      }
     }
   }
 
@@ -251,6 +227,11 @@ export class ExamsService {
 
     const shuffleQuestions = createExamDto.shuffleQuestions ?? true;
     const shuffleAlternatives = createExamDto.shuffleAlternatives ?? true;
+    const distributeCorrectAlternatives =
+      this.normalizeDistributeCorrectAlternatives(
+        shuffleAlternatives,
+        createExamDto.distributeCorrectAlternatives,
+      );
     const versionsCount = this.normalizeVersionsCount(
       shuffleQuestions,
       shuffleAlternatives,
@@ -266,6 +247,7 @@ export class ExamsService {
           userId: examOwnerId,
           shuffleQuestions,
           shuffleAlternatives,
+          distributeCorrectAlternatives,
           versionsCountDefault: versionsCount,
         },
       });
@@ -293,20 +275,25 @@ export class ExamsService {
 
       this.validateQuestionAlternativesForVersionCreation(
         questionsWithAlternatives,
+        distributeCorrectAlternatives,
       );
 
       const questionById = new Map(
         questionsWithAlternatives.map((question) => [question.id, question]),
       );
 
-      const baseOrderedQuestions = createExamDto.questionIds.map((questionId) => {
-        const question = questionById.get(questionId);
-        if (!question) {
-          throw new NotFoundException(`Question with ID ${questionId} not found`);
-        }
+      const baseOrderedQuestions = createExamDto.questionIds.map(
+        (questionId) => {
+          const question = questionById.get(questionId);
+          if (!question) {
+            throw new NotFoundException(
+              `Question with ID ${questionId} not found`,
+            );
+          }
 
-        return question;
-      });
+          return question;
+        },
+      );
 
       for (let index = 0; index < versionsCount; index += 1) {
         const versionQuestions = this.shuffleQuestions(
@@ -318,7 +305,11 @@ export class ExamsService {
           data: {
             name: this.buildVersionName(index),
             examId: createdExam.id,
-            orderData: this.buildOrderData(versionQuestions, shuffleAlternatives),
+            orderData: buildExamVersionOrderData(versionQuestions, {
+              shuffleAlternatives,
+              distributeCorrectAlternatives,
+              shuffleArray: this.shuffleArray.bind(this),
+            }),
           },
         });
       }
@@ -335,7 +326,11 @@ export class ExamsService {
   ): Promise<{
     disciplineId: string;
     questionIds: string[];
-    topicSelections: Array<{ topicId: string; quantity: number; questionIds: string[] }>;
+    topicSelections: Array<{
+      topicId: string;
+      quantity: number;
+      questionIds: string[];
+    }>;
   }> {
     await this.ensureDisciplineAccess(drawQuestionsDto.disciplineId, authUser);
 
@@ -394,10 +389,10 @@ export class ExamsService {
         );
       }
 
-      const drawnQuestionIds = this.shuffleQuestions(availableQuestionIds, true).slice(
-        0,
-        quantity,
-      );
+      const drawnQuestionIds = this.shuffleQuestions(
+        availableQuestionIds,
+        true,
+      ).slice(0, quantity);
 
       questionIds.push(...drawnQuestionIds);
       topicSelections.push({
@@ -443,6 +438,9 @@ export class ExamsService {
       updateExamDto.shuffleQuestions ?? currentExam.shuffleQuestions;
     const shuffleAlternatives =
       updateExamDto.shuffleAlternatives ?? currentExam.shuffleAlternatives;
+    const distributeCorrectAlternatives =
+      updateExamDto.distributeCorrectAlternatives ??
+      currentExam.distributeCorrectAlternatives;
     const versionsCountDefault = this.normalizeVersionsCount(
       shuffleQuestions,
       shuffleAlternatives,
@@ -456,6 +454,11 @@ export class ExamsService {
         description: updateExamDto.description,
         shuffleQuestions: updateExamDto.shuffleQuestions,
         shuffleAlternatives: updateExamDto.shuffleAlternatives,
+        distributeCorrectAlternatives:
+          this.normalizeDistributeCorrectAlternatives(
+            shuffleAlternatives,
+            distributeCorrectAlternatives,
+          ),
         versionsCountDefault,
       },
     });
@@ -492,7 +495,8 @@ export class ExamsService {
 
     if (
       !question ||
-      (!this.isAdmin(authUser) && question.topic.discipline.userId !== authUser.id)
+      (!this.isAdmin(authUser) &&
+        question.topic.discipline.userId !== authUser.id)
     ) {
       throw new NotFoundException(
         `Question with ID ${addExamQuestionDto.questionId} not found`,

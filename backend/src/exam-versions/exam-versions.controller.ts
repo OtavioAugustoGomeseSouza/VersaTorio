@@ -28,6 +28,7 @@ export class ExamVersionsController {
       createExamVersionDto.name,
       createExamVersionDto.shuffleQuestions,
       createExamVersionDto.shuffleAlternatives,
+      createExamVersionDto.distributeCorrectAlternatives,
       authUser,
     );
   }
