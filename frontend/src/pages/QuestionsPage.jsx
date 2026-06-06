@@ -5,6 +5,7 @@ import { appConfig } from '../lib/app-config';
 
 const DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE =
   appConfig.defaults.dissertativeAnswerSpaceSize;
+const DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT = 4;
 
 function optionLetter(index) {
   return String.fromCharCode(65 + index);
@@ -61,6 +62,13 @@ function createAlternativeDraft(initial = {}) {
     existingImageFileId: null,
     ...initial,
   };
+}
+
+function createDefaultAlternativeDrafts() {
+  return Array.from(
+    { length: DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT },
+    () => createAlternativeDraft(),
+  );
 }
 
 function createQuestionImageDraft(initial = {}) {
@@ -183,10 +191,9 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE,
   );
   const [questionImageDrafts, setQuestionImageDrafts] = useState([]);
-  const [questionAlternatives, setQuestionAlternatives] = useState([
-    createAlternativeDraft(),
-    createAlternativeDraft(),
-  ]);
+  const [questionAlternatives, setQuestionAlternatives] = useState(
+    createDefaultAlternativeDrafts,
+  );
   const [editingQuestionId, setEditingQuestionId] = useState('');
   const [initialAlternativeIds, setInitialAlternativeIds] = useState([]);
   const [deletedAlternativeIds, setDeletedAlternativeIds] = useState([]);
@@ -352,7 +359,7 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     setQuestionAnswerText('');
     setQuestionAnswerSpaceSize(DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE);
     setQuestionImageDrafts([]);
-    setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
+    setQuestionAlternatives(createDefaultAlternativeDrafts());
   }
 
   function openQuestionModal() {
@@ -399,18 +406,20 @@ export default function QuestionsPage({ token, onUnauthorized }) {
 
     const normalizedAlternatives =
       question.type === 'MULTIPLE_CHOICE'
-        ? alternativesFromQuestion.length >= 2
+        ? alternativesFromQuestion.length >= DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT
           ? alternativesFromQuestion
           : [
               ...alternativesFromQuestion,
               ...Array.from(
                 {
-                  length: 2 - alternativesFromQuestion.length,
+                  length:
+                    DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT -
+                    alternativesFromQuestion.length,
                 },
                 () => createAlternativeDraft(),
               ),
             ]
-        : [createAlternativeDraft(), createAlternativeDraft()];
+        : createDefaultAlternativeDrafts();
 
     const questionImageDraftsFromQuestion = (question.questionImages ?? []).map(
       (questionImage) =>
@@ -456,10 +465,25 @@ export default function QuestionsPage({ token, onUnauthorized }) {
     if (nextType === 'MULTIPLE_CHOICE') {
       setQuestionAnswerText('');
       setQuestionAnswerSpaceSize(DEFAULT_DISSERTATIVE_ANSWER_SPACE_SIZE);
+      setQuestionAlternatives((currentAlternatives) =>
+        currentAlternatives.length >= DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT
+          ? currentAlternatives
+          : [
+              ...currentAlternatives,
+              ...Array.from(
+                {
+                  length:
+                    DEFAULT_MULTIPLE_CHOICE_ALTERNATIVES_COUNT -
+                    currentAlternatives.length,
+                },
+                () => createAlternativeDraft(),
+              ),
+            ],
+      );
       return;
     }
 
-    setQuestionAlternatives([createAlternativeDraft(), createAlternativeDraft()]);
+    setQuestionAlternatives(createDefaultAlternativeDrafts());
   }
 
   function addAlternativeDraft() {
