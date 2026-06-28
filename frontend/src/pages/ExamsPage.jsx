@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Tooltip from '../components/Tooltip';
 import { useToast } from '../components/ToastProvider';
 import { apiRequest } from '../lib/api';
 import { navigate } from '../lib/router';
@@ -812,6 +813,7 @@ export default function ExamsPage({ token, onUnauthorized }) {
                 }
               />
               Distribuir proporcionalmente alternativas corretas
+              <Tooltip text="Distribui as respostas corretas de forma equilibrada entre as posições A, B, C… evitando que todas fiquem concentradas em uma mesma letra." />
             </label>
           ) : null}
 
@@ -831,9 +833,20 @@ export default function ExamsPage({ token, onUnauthorized }) {
               )
             }
             disabled={!canChooseVersionsCount}
+            aria-describedby={!canChooseVersionsCount ? 'versions-count-hint' : undefined}
           />
+          {!canChooseVersionsCount && (
+            <p id="versions-count-hint" className="field-hint">
+              Ative o embaralhamento de questões ou de alternativas para gerar múltiplas versões.
+            </p>
+          )}
 
           <p>Questões selecionadas: {selectedQuestions.length}</p>
+          {selectedQuestionIds.length === 0 && (
+            <p className="field-hint-error" role="alert">
+              Selecione ao menos uma questão para criar a prova.
+            </p>
+          )}
 
           <button
             type="submit"
